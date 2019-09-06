@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import com.google.common.collect.Range;
-
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntriesCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -502,10 +501,12 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
 
     protected void sendMessagesToConsumers(ReadType readType, List<Entry> entries) {
 
+        if (entries == null || entries.size() == 0) {
+            return;
+        }
         if (needTrimAckedMessages()) {
             cursor.trimDeletedEntries(entries);
         }
-
         int entriesToDispatch = entries.size();
         // Trigger read more messages
         if (entriesToDispatch == 0) {

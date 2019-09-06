@@ -2981,5 +2981,6 @@ public class ManagedCursorImpl implements ManagedCursor {
         return isReadPositionOnTail || isReadPositionChanged;
     }
 
+
     private static final Logger log = LoggerFactory.getLogger(ManagedCursorImpl.class);
 }

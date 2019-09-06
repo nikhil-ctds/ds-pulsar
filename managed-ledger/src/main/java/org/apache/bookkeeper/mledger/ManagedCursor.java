@@ -679,4 +679,5 @@ public interface ManagedCursor {
      * @return if read position changed
      */
     boolean checkAndUpdateReadPositionChanged();
+
 }

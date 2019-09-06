@@ -362,6 +362,7 @@ public class ManagedCursorContainerTest {
         public boolean checkAndUpdateReadPositionChanged() {
             return false;
         }
+
     }
 
     @Test

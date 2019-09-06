@@ -117,10 +117,6 @@ public interface Dispatcher {
         //No-op
     }
 
-    default void cursorIsReset() {
-        //No-op
-    }
-
     default void markDeletePositionMoveForward() {
         // No-op
     }
@@ -132,4 +128,7 @@ public interface Dispatcher {
         return false;
     }
 
+    default void cursorIsReset() {
+        //No-op
+    }
 }
