@@ -1505,7 +1505,8 @@ public class BrokerService implements Closeable, ZooKeeperCacheListener<Policies
                         final ClusterReplicationMetrics clusterReplicationMetrics = pulsarStats
                                 .getClusterReplicationMetrics();
                         replicationClients.forEach((cluster, client) -> {
-                            clusterReplicationMetrics.remove(clusterReplicationMetrics.getKeyName(namespaceName, cluster));
+                            clusterReplicationMetrics.remove(clusterReplicationMetrics.getKeyName(namespaceName,
+                                    cluster));
                         });
                     }
                 }
