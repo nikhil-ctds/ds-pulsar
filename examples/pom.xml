@@ -33,7 +33,6 @@
   <name>Pulsar Examples :: Parent</name>
 
   <modules>
-    <module>flink</module>
     <module>spark</module>
   </modules>
 
