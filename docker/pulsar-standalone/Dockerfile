@@ -32,6 +32,9 @@ RUN apt-get update \
     && apt-get -y install wget gnupg && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 RUN bash -c "echo deb http://apt.postgresql.org/pub/repos/apt/ focal-pgdg main >> /etc/apt/sources.list.d/pgdg.list"
 
+# Help to make these directories persist between container restarts
+VOLUME  ["/pulsar/conf", "/pulsar/data"]
+
 # Note that the libpq-dev package is needed here in order to install
 # the required python psycopg2 package (for postgresql) later
 RUN apt-get update \
