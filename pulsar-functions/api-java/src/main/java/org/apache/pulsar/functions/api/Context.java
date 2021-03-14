@@ -20,6 +20,7 @@ package org.apache.pulsar.functions.api;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -32,6 +33,7 @@ import org.apache.pulsar.client.api.TypedMessageBuilder;
 import org.apache.pulsar.common.classification.InterfaceAudience;
 import org.apache.pulsar.common.classification.InterfaceStability;
 import org.slf4j.Logger;
+import org.apache.pulsar.common.io.TransformationConfig;
 
 /**
  * Context provides contextual information to the executing function.
@@ -263,6 +265,21 @@ public interface Context {
      * @return The secret if anything was found or null
      */
     String getSecret(String secretName);
+
+    /**
+     * Get a map of all user-defined key/value configs for the function.
+     *
+     * @return The full map of user-defined config values
+     */
+    List<TransformationConfig> getTransformationConfigs();
+
+    /**
+     * Get any user-defined transformation.
+     *
+     * @param index The transforlation index
+     * @return The Optional value specified by the user for that index.
+     */
+    Optional<TransformationConfig> getTransformationConfig(Integer index);
 
     /**
      * Get the pulsar admin client.
