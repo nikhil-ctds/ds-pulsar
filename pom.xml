@@ -238,6 +238,10 @@ flexible messaging model and an intuitive client API.</description>
 
     <!-- Used to configure rename.netty.native. Libs -->
     <rename.netty.native.libs>rename-netty-native-libs.sh</rename.netty.native.libs>
+
+    <sonar.projectKey>datastax_pulsar</sonar.projectKey>
+    <sonar.organization>datastax</sonar.organization>
+    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
   </properties>
 
   <dependencyManagement>
