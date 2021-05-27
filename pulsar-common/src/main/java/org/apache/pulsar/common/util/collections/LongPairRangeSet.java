@@ -274,7 +274,7 @@ public interface LongPairRangeSet<T extends Comparable<T>> {
         public Range<T> firstRange() {
             Iterator<Range<T>> iterable = set.asRanges().iterator();
             if (iterable.hasNext()) {
-                return set.asRanges().iterator().next();
+                return iterable.next();
             }
             return null;
         }
