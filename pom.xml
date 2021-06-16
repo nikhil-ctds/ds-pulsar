@@ -425,6 +425,10 @@ flexible messaging model and an intuitive client API.</description>
             <artifactId>grpc-all</artifactId>
           </exclusion>
 
+          <exclusion>
+            <groupId>org.inferred</groupId>
+            <artifactId>freebuilder</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
 
