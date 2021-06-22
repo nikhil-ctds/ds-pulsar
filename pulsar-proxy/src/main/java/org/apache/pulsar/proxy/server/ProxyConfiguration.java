@@ -528,6 +528,16 @@ public class ProxyConfiguration implements PulsarConfiguration {
     private int httpProxyTimeout = 5 * 60 * 1000;
 
     @FieldContext(
+            minValue = 1,
+            category = CATEGORY_HTTP,
+            doc = "Http input buffer max size.\n\n"
+                    + "The maximum amount of data that will be buffered for incoming http requests "
+                    + "so that the request body can be replayed when the backend broker "
+                    + "issues a redirect response."
+    )
+    private int httpInputMaxReplayBufferSize = 5 * 1024 * 1024;
+
+    @FieldContext(
            minValue = 1,
            category = CATEGORY_HTTP,
            doc = "Number of threads to use for HTTP requests processing"
