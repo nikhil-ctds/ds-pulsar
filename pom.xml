@@ -1132,6 +1132,7 @@ flexible messaging model and an intuitive client API.</description>
             -Dpulsar.allocator.leak_detection=Advanced
             -Dpulsar.allocator.exit_on_oom=false
             -Dlog4j.configurationFile=log4j2.xml
+            -Dio.netty.tryReflectionSetAccessible=true
             ${test.additional.args}
           </argLine>
           <reuseForks>${testReuseFork}</reuseForks>

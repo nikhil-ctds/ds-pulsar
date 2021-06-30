@@ -21,6 +21,9 @@
 BINDIR=$(dirname "$0")
 export PULSAR_HOME=`cd -P $BINDIR/..;pwd`
 . "$PULSAR_HOME/bin/pulsar-admin-common.sh"
+# Allow Netty to use reflection access
+OPTS="$OPTS -Dio.netty.tryReflectionSetAccessible=true"
+
 
 # functions related variables
 FUNCTIONS_HOME=$PULSAR_HOME/pulsar-functions
