@@ -59,7 +59,6 @@ import org.apache.pulsar.io.kafka.connect.schema.PulsarSchemaToKafkaSchema;
 
 
 import static org.apache.pulsar.io.kafka.connect.PulsarKafkaWorkerConfig.OFFSET_STORAGE_TOPIC_CONFIG;
-import static org.apache.pulsar.io.kafka.connect.PulsarKafkaWorkerConfig.PULSAR_SERVICE_URL_CONFIG;
 
 @Slf4j
 public class KafkaConnectSink implements Sink<GenericObject> {
@@ -166,7 +165,6 @@ public class KafkaConnectSink implements Sink<GenericObject> {
 
         configs.forEach(x -> {
             x.put(OFFSET_STORAGE_TOPIC_CONFIG, kafkaSinkConfig.getOffsetStorageTopic());
-            x.put(PULSAR_SERVICE_URL_CONFIG, kafkaSinkConfig.getPulsarServiceUrl());
         });
         task = (SinkTask) taskClass.getConstructor().newInstance();
         taskContext =
