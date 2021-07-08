@@ -38,6 +38,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -58,6 +59,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
+import lombok.Cleanup;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -108,6 +110,7 @@ import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.MockZooKeeper;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
+import org.awaitility.Awaitility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -1933,6 +1936,49 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
         ml.close();
         assertTrue(ml.getLedgersInfoAsList().size() > 1);
         assertTrue(ml.getTotalSize() > "shortmessage".getBytes().length);
+    }
+
+    @Test
+    public void testRetentionSize() throws Exception {
+        final int retentionSizeInMB = 5;
+        final int totalMessage = 10;
+
+        // message size is 1MB
+        final int messageSize = 1048576;
+        char[] data = new char[messageSize];
+        Arrays.fill(data, 'a');
+        byte [] message = new String(data).getBytes(Encoding);
+
+        @Cleanup("shutdown")
+        ManagedLedgerFactory factory = new ManagedLedgerFactoryImpl(bkc, bkc.getZkHandle());
+        ManagedLedgerConfig config = new ManagedLedgerConfig();
+        config.setRetentionSizeInMB(retentionSizeInMB);
+        config.setMaxEntriesPerLedger(1);
+        config.setRetentionTime(1, TimeUnit.HOURS);
+
+
+        ManagedLedgerImpl ml = (ManagedLedgerImpl) factory.open("retention_size_ledger", config);
+        ManagedCursor c1 = ml.openCursor("c1");
+        Position position = null;
+        for (int i = 0; i < totalMessage; i++) {
+            position = ml.addEntry(message);
+        }
+        // all ledgers are not delete yet since no entry has been acked for c1
+        assertEquals(ml.getLedgersInfoAsList().size(), totalMessage);
+
+        List<Entry> entryList = c1.readEntries(totalMessage);
+        if (null != position) {
+            c1.markDelete(position);
+        }
+        entryList.forEach(entry -> {
+            log.info("Read entry position {}:{}", entry.getLedgerId(), entry.getEntryId());
+            entry.release();
+        });
+
+        Awaitility.await().untilAsserted(() -> {
+            assertTrue(ml.getTotalSize() <= retentionSizeInMB * 1024 * 1024);
+            assertEquals(ml.getLedgersInfoAsList().size(), 5);
+        });
     }
 
     @Test
