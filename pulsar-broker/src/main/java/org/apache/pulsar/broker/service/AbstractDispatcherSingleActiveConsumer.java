@@ -54,6 +54,8 @@ public abstract class AbstractDispatcherSingleActiveConsumer extends AbstractBas
             AtomicIntegerFieldUpdater.newUpdater(AbstractDispatcherSingleActiveConsumer.class, "isClosed");
     private volatile int isClosed = FALSE;
 
+    protected boolean isFirstRead = true;
+
     public AbstractDispatcherSingleActiveConsumer(SubType subscriptionType, int partitionIndex,
             String topicName, Subscription subscription) {
         super(subscription);
@@ -155,6 +157,10 @@ public abstract class AbstractDispatcherSingleActiveConsumer extends AbstractBas
             isKeyHashRangeFiltered = true;
         } else {
             isKeyHashRangeFiltered = false;
+        }
+
+        if (consumers.isEmpty()) {
+            isFirstRead = true;
         }
 
         consumers.add(consumer);
