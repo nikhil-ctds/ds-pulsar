@@ -611,8 +611,9 @@ public class PersistentDispatcherSingleActiveConsumer extends AbstractDispatcher
     }
 
     @Override
-    public void addMessageToReplay(long ledgerId, long entryId) {
+    public boolean addMessageToReplay(long ledgerId, long entryId) {
         this.messagesToRedeliver.add(ledgerId, entryId);
+        return true;
     }
 
     public boolean checkAndUnblockIfStuck() {

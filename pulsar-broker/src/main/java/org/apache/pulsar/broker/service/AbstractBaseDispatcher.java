@@ -239,8 +239,9 @@ public abstract class AbstractBaseDispatcher implements Dispatcher {
         return key;
     }
 
-    protected void addMessageToReplay(long ledgerId, long entryId) {
+    protected boolean addMessageToReplay(long ledgerId, long entryId) {
         // No-op
+        return true;
     }
 
     private void handleTxnCommitMarker(Entry entry) {
