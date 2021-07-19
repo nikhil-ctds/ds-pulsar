@@ -86,7 +86,10 @@ import org.apache.pulsar.common.policies.data.BacklogQuota;
 import org.apache.pulsar.common.policies.data.BacklogQuota.RetentionPolicy;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.ReplicatorStats;
+<<<<<<< HEAD
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
+=======
+>>>>>>> 60d462a0dc5 (Close the replicator and replication client when delete cluster. (#11342))
 import org.apache.pulsar.common.policies.data.TenantInfoImpl;
 import org.apache.pulsar.common.protocol.Commands;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
