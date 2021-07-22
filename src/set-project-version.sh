@@ -40,5 +40,6 @@ mvn versions:set -DnewVersion=$NEW_VERSION -pl buildtools
 mvn versions:set -DnewVersion=$NEW_VERSION -pl pulsar-sql/presto-distribution
 # install the new version of root pom local, so `update-parent` can update the right parent version
 sed -i -e "s/${OLD_VERSION}/${NEW_VERSION}/g" protobuf-shaded/pom.xml
-
+# MacOS sometimes leaves this file
+rm -f protobuf-shaded/pom.xml-e
 popd
