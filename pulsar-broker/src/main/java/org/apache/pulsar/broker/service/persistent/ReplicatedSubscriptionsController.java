@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.service.Replicator;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.common.api.proto.PulsarApi.CommandAck.AckType;
 import org.apache.pulsar.common.api.proto.PulsarApi.CommandSubscribe.InitialPosition;
@@ -121,6 +122,12 @@ public class ReplicatedSubscriptionsController implements AutoCloseable, Topic.P
     }
 
     private void receivedSnapshotRequest(ReplicatedSubscriptionsSnapshotRequest request) {
+        // if replicator producer is already closed, restart it to send snapshot response
+        Replicator replicator = topic.getReplicators().get(request.getSourceCluster());
+        if (!replicator.isConnected()) {
+            topic.startReplProducers();
+        }
+
         // Send response containing the current last written message id. The response
         // marker we're publishing locally and then replicating will have a higher
         // message id.
