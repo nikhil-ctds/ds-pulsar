@@ -108,8 +108,7 @@ public class PulsarSink<T> implements Sink<T> {
                 throws PulsarClientException {
             ProducerBuilder<T> builder = client.newProducer(schema)
                     .blockIfQueueFull(true)
-                    .enableBatching(true)
-                    .batchingMaxPublishDelay(10, TimeUnit.MILLISECONDS)
+                    .enableBatching(false)
                     .compressionType(CompressionType.LZ4)
                     .hashingScheme(HashingScheme.Murmur3_32Hash) //
                     .messageRoutingMode(MessageRoutingMode.CustomPartition)

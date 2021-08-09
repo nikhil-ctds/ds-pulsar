@@ -456,8 +456,7 @@ class ContextImpl implements Context, SinkContext, SourceContext, AutoCloseable 
             Producer<O> newProducer = ((ProducerBuilderImpl<O>) pulsar.getProducerBuilder().clone())
                     .schema(schema)
                     .blockIfQueueFull(true)
-                    .enableBatching(true)
-                    .batchingMaxPublishDelay(10, TimeUnit.MILLISECONDS)
+                    .enableBatching(false)
                     .compressionType(CompressionType.LZ4)
                     .hashingScheme(HashingScheme.Murmur3_32Hash) //
                     .messageRoutingMode(MessageRoutingMode.CustomPartition)

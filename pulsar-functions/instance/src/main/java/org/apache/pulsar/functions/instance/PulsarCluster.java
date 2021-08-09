@@ -51,8 +51,7 @@ public class PulsarCluster {
     public PulsarCluster(PulsarClient client, ProducerSpec producerSpec) {
         this.client = client;
         this.topicSchema = new TopicSchema(client);
-        this.producerBuilder = (ProducerBuilderImpl<?>) client.newProducer().blockIfQueueFull(true).enableBatching(true)
-                .batchingMaxPublishDelay(1, TimeUnit.MILLISECONDS);
+        this.producerBuilder = (ProducerBuilderImpl<?>) client.newProducer().blockIfQueueFull(true);
         boolean useThreadLocalProducers = false;
         if (producerSpec != null) {
             if (producerSpec.getMaxPendingMessages() != 0) {
