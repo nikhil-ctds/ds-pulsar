@@ -137,13 +137,21 @@ public class PulsarSink<T> implements Sink<T> {
                         builder.addEncryptionKey(encryptionKeyName);
                     }
                 }
+
+                log.info("DEBUG producerConfig: {}",producerConfig.getBatchBuilder());
+
                 if (producerConfig.getBatchBuilder() != null) {
                     if (producerConfig.getBatchBuilder().equals("KEY_BASED")) {
+                        log.info("DEBUG Enabling key-based batching in PulsarSink");
+
                         builder.batcherBuilder(BatcherBuilder.KEY_BASED);
                     } else {
                         builder.batcherBuilder(BatcherBuilder.DEFAULT);
                     }
                 }
+                // DEBUG: Always enabled key-based batching
+                log.info("DEBUG Forcing key-based batching in PulsarSink");
+                builder.batcherBuilder(BatcherBuilder.KEY_BASED);
             }
             return builder.properties(properties).create();
         }

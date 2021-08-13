@@ -20,6 +20,7 @@
 package org.apache.pulsar.functions.instance;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.BatcherBuilder;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
@@ -31,7 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-
+@Slf4j
 public class PulsarCluster {
     @Getter
     private PulsarClient client;
@@ -61,13 +62,24 @@ public class PulsarCluster {
             if (producerSpec.getMaxPendingMessagesAcrossPartitions() != 0) {
                 this.producerBuilder.maxPendingMessagesAcrossPartitions(producerSpec.getMaxPendingMessagesAcrossPartitions());
             }
+
+            log.info("DEBUG producerSpec: {}",producerSpec.getBatchBuilder());
+
+            
             if (producerSpec.getBatchBuilder() != null) {
                 if (producerSpec.getBatchBuilder().equals("KEY_BASED")) {
+                    log.info("DEBUG Enabling key-based batching in PulsarCluster");
+
                     this.producerBuilder.batcherBuilder(BatcherBuilder.KEY_BASED);
                 } else {
                     this.producerBuilder.batcherBuilder(BatcherBuilder.DEFAULT);
                 }
             }
+
+            // DEBUG: Always enabled key-based batching
+            log.info("DEBUG Forcing key-based batching in PulsarCluster");
+            this.producerBuilder.batcherBuilder(BatcherBuilder.KEY_BASED);
+
             useThreadLocalProducers = producerSpec.getUseThreadLocalProducers();
         }
         if (useThreadLocalProducers) {
