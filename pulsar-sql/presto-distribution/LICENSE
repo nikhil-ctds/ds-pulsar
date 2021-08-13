@@ -252,21 +252,22 @@ The Apache Software License, Version 2.0
     - joda-time-2.10.5.jar
     - joda-time-2.10.1.jar
  * Jetty
-    - http2-client-9.4.27.v20200227.jar
-    - http2-common-9.4.27.v20200227.jar
-    - http2-hpack-9.4.27.v20200227.jar
-    - http2-http-client-transport-9.4.27.v20200227.jar
-    - http2-server-9.4.27.v20200227.jar
-    - jetty-alpn-client-9.4.27.v20200227.jar
-    - jetty-alpn-java-client-9.4.27.v20200227.jar
-    - jetty-client-9.4.27.v20200227.jar
-    - jetty-http-9.4.27.v20200227.jar
-    - jetty-io-9.4.27.v20200227.jar
-    - jetty-jmx-9.4.27.v20200227.jar
-    - jetty-security-9.4.27.v20200227.jar
-    - jetty-server-9.4.27.v20200227.jar
-    - jetty-servlet-9.4.27.v20200227.jar
-    - jetty-util-9.4.27.v20200227.jar
+    - http2-client-9.4.43.v20210629.jar
+    - http2-common-9.4.43.v20210629.jar
+    - http2-hpack-9.4.43.v20210629.jar
+    - http2-http-client-transport-9.4.43.v20210629.jar
+    - jetty-alpn-client-9.4.43.v20210629.jar
+    - http2-server-9.4.43.v20210629.jar
+    - jetty-alpn-java-client-9.4.43.v20210629.jar
+    - jetty-client-9.4.43.v20210629.jar
+    - jetty-http-9.4.43.v20210629.jar
+    - jetty-io-9.4.43.v20210629.jar
+    - jetty-jmx-9.4.43.v20210629.jar
+    - jetty-security-9.4.43.v20210629.jar
+    - jetty-server-9.4.43.v20210629.jar
+    - jetty-servlet-9.4.43.v20210629.jar
+    - jetty-util-9.4.43.v20210629.jar
+    - jetty-util-ajax-9.4.43.v20210629.jar
   * Apache BVal
     - bval-jsr-2.0.0.jar
   * Bytecode
