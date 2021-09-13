@@ -38,5 +38,6 @@
         <suite-file path="./pulsar-python.xml" />
         <suite-file path="./pulsar-semantics.xml" />
         <suite-file path="./pulsar-upgrade.xml" />
+        <suite-file path="./pulsar-io-ora-source.xml" />
     </suite-files>
 </suite>
