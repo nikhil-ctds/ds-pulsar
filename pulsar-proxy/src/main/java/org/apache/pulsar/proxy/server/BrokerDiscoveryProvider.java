@@ -50,6 +50,7 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 /**
  * Maintains available active broker list and returns next active broker in round-robin for discovery service.
  *
+ * This is an API used by Proxy Extensions.
  */
 public class BrokerDiscoveryProvider implements Closeable {
 

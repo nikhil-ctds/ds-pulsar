@@ -63,7 +63,7 @@ import org.apache.pulsar.common.configuration.PulsarConfigurationLoader;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.metadata.api.MetadataStoreException;
 import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
-import org.apache.pulsar.proxy.protocol.ProtocolHandlers;
+import org.apache.pulsar.proxy.extensions.ProxyExtensions;
 import org.apache.pulsar.proxy.stats.TopicStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +90,7 @@ public class ProxyService implements Closeable {
     private MetadataStoreExtended localMetadataStore;
     private MetadataStoreExtended configMetadataStore;
     private PulsarResources pulsarResources;
-    private ProtocolHandlers protocolHandlers = null;
+    private ProxyExtensions proxyExtensions = null;
 
     private final EventLoopGroup acceptorGroup;
     private final EventLoopGroup workerGroup;
@@ -167,8 +167,8 @@ public class ProxyService implements Closeable {
                 proxyConfig.getBrokerProxyAllowedTargetPorts());
 
         // Initialize the message protocol handlers
-        protocolHandlers = ProtocolHandlers.load(proxyConfig);
-        protocolHandlers.initialize(proxyConfig);
+        proxyExtensions = ProxyExtensions.load(proxyConfig);
+        proxyExtensions.initialize(proxyConfig);
 
         statsExecutor = Executors
                 .newSingleThreadScheduledExecutor(new DefaultThreadFactory("proxy-stats-executor"));
@@ -254,20 +254,20 @@ public class ProxyService implements Closeable {
         // Initialize the message protocol handlers.
         // start the protocol handlers only after the broker is ready,
         // so that the protocol handlers can access broker service properly.
-        this.protocolHandlers.start(this);
+        this.proxyExtensions.start(this);
         Map<String, Map<InetSocketAddress, ChannelInitializer<SocketChannel>>> protocolHandlerChannelInitializers =
-                this.protocolHandlers.newChannelInitializers();
-        startProtocolHandlers(protocolHandlerChannelInitializers, bootstrap);
+                this.proxyExtensions.newChannelInitializers();
+        startProxyExtensions(protocolHandlerChannelInitializers, bootstrap);
     }
 
     // This call is used for starting additional protocol handlers
-    public void startProtocolHandlers(
+    public void startProxyExtensions(
             Map<String, Map<InetSocketAddress, ChannelInitializer<SocketChannel>>> protocolHandlers, ServerBootstrap serverBootstrap) {
 
-        protocolHandlers.forEach((protocol, initializers) -> {
+        protocolHandlers.forEach((extensionName, initializers) -> {
             initializers.forEach((address, initializer) -> {
                 try {
-                    startProtocolHandler(protocol, address, initializer, serverBootstrap);
+                    startProxyExtension(extensionName, address, initializer, serverBootstrap);
                 } catch (IOException e) {
                     LOG.error("{}", e.getMessage(), e.getCause());
                     throw new RuntimeException(e.getMessage(), e.getCause());
@@ -276,18 +276,18 @@ public class ProxyService implements Closeable {
         });
     }
 
-    private void startProtocolHandler(String protocol,
-                                      SocketAddress address,
-                                      ChannelInitializer<SocketChannel> initializer,
-                                      ServerBootstrap serverBootstrap) throws IOException {
+    private void startProxyExtension(String extensionName,
+                                     SocketAddress address,
+                                     ChannelInitializer<SocketChannel> initializer,
+                                     ServerBootstrap serverBootstrap) throws IOException {
         ServerBootstrap bootstrap = serverBootstrap.clone();
         bootstrap.childHandler(initializer);
         try {
             bootstrap.bind(address).sync();
         } catch (Exception e) {
-            throw new IOException("Failed to bind protocol `" + protocol + "` on " + address, e);
+            throw new IOException("Failed to bind extension `" + extensionName + "` on " + address, e);
         }
-        LOG.info("Successfully bind protocol `{}` on {}", protocol, address);
+        LOG.info("Successfully bound extension `{}` on {}", extensionName, address);
     }
 
     public BrokerDiscoveryProvider getDiscoveryProvider() {
