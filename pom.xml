@@ -29,7 +29,7 @@
     <version>18</version>
   </parent>
 
-  <groupId>org.apache.pulsar</groupId>
+  <groupId>com.datastax.oss</groupId>
 
 
   <artifactId>pulsar</artifactId>
@@ -97,7 +97,7 @@ flexible messaging model and an intuitive client API.</description>
     <docker.organization>apachepulsar</docker.organization>
 
     <!-- pin the protobuf-shaded version to make the pulsar build friendly to intellij -->
-    <pulsar.protobuf.shaded.version>2.1.0-incubating</pulsar.protobuf.shaded.version>
+    <pulsar.protobuf.shaded.version>${project.version}</pulsar.protobuf.shaded.version>
 
 
     <!-- apache commons -->
@@ -1052,7 +1052,7 @@ flexible messaging model and an intuitive client API.</description>
   <dependencies>
     <!-- These dependencies are common to all the submodules -->
     <dependency>
-      <groupId>org.apache.pulsar</groupId>
+      <groupId>com.datastax.oss</groupId>
       <artifactId>buildtools</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
@@ -1132,7 +1132,7 @@ flexible messaging model and an intuitive client API.</description>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <dependencies>
           <dependency>
-            <groupId>org.apache.pulsar</groupId>
+            <groupId>com.datastax.oss</groupId>
             <artifactId>buildtools</artifactId>
             <version>${project.version}</version>
           </dependency>

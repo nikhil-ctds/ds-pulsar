@@ -24,7 +24,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.apache.pulsar</groupId>
+    <groupId>com.datastax.oss</groupId>
     <artifactId>pulsar-functions</artifactId>
     <version>2.1.0-incubating-SNAPSHOT</version>
     <relativePath>..</relativePath>
@@ -85,11 +85,11 @@
                   <include>com.google.instrumentation:instrumentation-api</include>
                   <include>com.google.api.grpc:proto-google-common-protos</include>
                   <!-- dependencies use protobuf -->
-                  <include>org.apache.pulsar:pulsar-functions-proto</include>
-                  <include>org.apache.pulsar:pulsar-functions-utils</include>
-                  <include>org.apache.pulsar:pulsar-functions-instance</include>
-                  <include>org.apache.pulsar:pulsar-functions-runtime</include>
-                  <include>org.apache.pulsar:pulsar-functions-worker</include>
+                  <include>com.datastax.oss:pulsar-functions-proto</include>
+                  <include>com.datastax.oss:pulsar-functions-utils</include>
+                  <include>com.datastax.oss:pulsar-functions-instance</include>
+                  <include>com.datastax.oss:pulsar-functions-runtime</include>
+                  <include>com.datastax.oss:pulsar-functions-worker</include>
                   <!-- protobuf dependencies in grpc -->
                   <include>io.grpc:*</include>
                   <!-- bookkeeper key/value service -->

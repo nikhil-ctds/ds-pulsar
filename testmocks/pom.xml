@@ -24,7 +24,7 @@
 
   <parent>
     <artifactId>pulsar</artifactId>
-    <groupId>org.apache.pulsar</groupId>
+    <groupId>com.datastax.oss</groupId>
     <version>2.7.2.1.1.7-SNAPSHOT</version>
   </parent>
 

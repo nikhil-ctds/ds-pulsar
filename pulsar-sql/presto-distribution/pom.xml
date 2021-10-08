@@ -28,7 +28,7 @@
         <version>18</version>
     </parent>
 
-    <groupId>org.apache.pulsar</groupId>
+    <groupId>com.datastax.oss</groupId>
     <artifactId>pulsar-presto-distribution</artifactId>
     <name>Pulsar SQL :: Pulsar Presto Distribution</name>
     <version>2.7.2.1.1.7-SNAPSHOT</version>
@@ -166,7 +166,7 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.pulsar</groupId>
+            <groupId>com.datastax.oss</groupId>
             <artifactId>presto-password-authenticators-plugin</artifactId>
             <version>${project.version}</version>
             <type>tar.gz</type>
