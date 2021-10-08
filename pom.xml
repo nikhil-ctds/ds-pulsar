@@ -1724,6 +1724,7 @@ flexible messaging model and an intuitive client API.</description>
 
       </activation>
       <modules>
+        <module>protobuf-shaded</module>
         <module>buildtools</module>
         <module>testmocks</module>
         <module>managed-ledger</module>
@@ -1787,6 +1788,7 @@ flexible messaging model and an intuitive client API.</description>
       <id>core-modules</id>
 
       <modules>
+        <module>protobuf-shaded</module>
         <module>buildtools</module>
         <module>testmocks</module>
         <module>managed-ledger</module>
