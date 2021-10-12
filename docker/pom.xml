@@ -34,7 +34,6 @@
     <module>pulsar</module>
     <module>grafana</module>
     <module>pulsar-all</module>
-    <module>pulsar-standalone</module>
   </modules>
   <build>
     <plugins>
