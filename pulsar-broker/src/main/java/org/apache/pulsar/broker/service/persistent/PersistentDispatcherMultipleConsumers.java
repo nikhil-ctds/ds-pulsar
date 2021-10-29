@@ -553,7 +553,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
                 int end = Math.min(start + messagesForC, entries.size());
                 // remove positions first from replay list first : sendMessages recycles entries
                 if (readType == ReadType.Replay) {
-                    entries.subList(start, start + messagesForC).forEach(entry -> {
+                    entries.subList(start, end).forEach(entry -> {
                                 redeliveryMessages.remove(entry.getLedgerId(), entry.getEntryId());
                     });
                 }
