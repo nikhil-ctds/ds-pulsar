@@ -171,6 +171,10 @@ functionRuntimeFactoryConfigs:
 #  extraFunctionDependenciesDir:
 #  # Additional memory padding added on top of the memory requested by the function per on a per instance basis
 #  percentMemoryPadding: 10
+#  # The duration in seconds before the StatefulSet deleted on function stop/restart.
+#  # Value must be non-negative integer. The value zero indicates delete immediately.
+#  # Default is 5 seconds.
+#  gracePeriodSeconds: 5
 #  # The ratio cpu request and cpu limit to be set for a function/source/sink.
 #  # The formula for cpu request is cpuRequest = userRequestCpu / cpuOverCommitRatio
 #  cpuOverCommitRatio: 1.0
