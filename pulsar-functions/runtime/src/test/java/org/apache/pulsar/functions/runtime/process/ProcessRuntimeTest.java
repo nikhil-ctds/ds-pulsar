@@ -276,16 +276,16 @@ public class ProcessRuntimeTest {
         int portArg;
         int metricsPortArg;
         if (null != depsDir) {
-            assertEquals(args.size(), 39);
+            assertEquals(args.size(), 40);
             extraDepsEnv = " -Dpulsar.functions.extra.dependencies.dir=" + depsDir.toString();
             classpath = classpath + ":" + depsDir + "/*";
+            portArg = 25;
+            metricsPortArg = 27;
+        } else {
+            assertEquals(args.size(), 39);
+            extraDepsEnv = "";
             portArg = 24;
             metricsPortArg = 26;
-        } else {
-            assertEquals(args.size(), 38);
-            extraDepsEnv = "";
-            portArg = 23;
-            metricsPortArg = 25;
         }
 
         String expectedArgs = "java -cp " + classpath
@@ -294,6 +294,7 @@ public class ProcessRuntimeTest {
                 + " -Dlog4j.configurationFile=java_instance_log4j2.xml "
                 + "-Dpulsar.function.log.dir=" + logDirectory + "/functions/" + FunctionCommon.getFullyQualifiedName(config.getFunctionDetails())
                 + " -Dpulsar.function.log.file=" + config.getFunctionDetails().getName() + "-" + config.getInstanceId()
+                + " -Dio.netty.tryReflectionSetAccessible=true"
                 + " org.apache.pulsar.functions.instance.JavaInstanceMain"
                 + " --jar " + userJarFile + " --instance_id "
                 + config.getInstanceId() + " --function_id " + config.getFunctionId()
