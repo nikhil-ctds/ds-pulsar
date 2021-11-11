@@ -251,7 +251,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
                 }
 
                 addLogTopicHandler();
-                CompletableFuture<JavaExecutionResult> result;
+                CompletableFuture<JavaExecutionResult> result = null;
 
                 // set last invocation time
                 stats.setLastInvocation(System.currentTimeMillis());
@@ -275,7 +275,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
 
                 removeLogTopicHandler();
 
-                if (handleMessageSucceeded) {
+                if (handleMessageSucceeded && result != null) {
                     try {
                         processResult(currentRecord, result);
                     } catch (Exception e) {
