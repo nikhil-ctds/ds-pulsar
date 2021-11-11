@@ -105,6 +105,7 @@ public class JavaInstance implements AutoCloseable {
                 }
 
                 if (throwable != null) {
+                    log.warn("function CompletableFuture throwable: {}", throwable);
                     executionResult.setUserException(new Exception((Throwable)throwable));
                     pendingAsyncRequests.remove(output);
                     future.complete(executionResult);

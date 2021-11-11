@@ -260,8 +260,14 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
                 stats.processTimeStart();
 
                 // process the message
+                boolean handleMessageSucceeded = true;
                 Thread.currentThread().setContextClassLoader(functionClassLoader);
-                result = javaInstance.handleMessage(currentRecord, currentRecord.getValue());
+                try {
+                    result = javaInstance.handleMessage(currentRecord, currentRecord.getValue());
+                } catch (Exception e) {
+                    log.warn("Function currentRecord {} failed to handleMessage with exception {}", currentRecord, e);
+                    handleMessageSucceeded = false;
+                }
                 Thread.currentThread().setContextClassLoader(instanceClassLoader);
 
                 // register end time
@@ -269,10 +275,14 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
 
                 removeLogTopicHandler();
 
-                try {
-                    processResult(currentRecord, result);
-                } catch (Exception e) {
-                    log.warn("Failed to process result of message {}", currentRecord, e);
+                if (handleMessageSucceeded) {
+                    try {
+                        processResult(currentRecord, result);
+                    } catch (Exception e) {
+                        log.warn("Failed to process result of message {} exception {}", currentRecord, e);
+                        currentRecord.fail();
+                    }
+                } else {
                     currentRecord.fail();
                 }
             }
