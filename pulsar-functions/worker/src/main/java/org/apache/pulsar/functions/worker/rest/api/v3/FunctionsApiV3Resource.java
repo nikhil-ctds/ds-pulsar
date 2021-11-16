@@ -384,7 +384,7 @@ public class FunctionsApiV3Resource extends FunctionApiResource {
                                                  final @PathParam("functionName") String functionName,
                                                  final @FormDataParam("functionMetaData") InputStream uploadedInputStream,
                                                  final @FormDataParam("delete") boolean delete) {
-
+        log.info("updateFunctionOnWorkerLeader {} {} {} {}", tenant, namespace, functionName, delete);
         functions.updateFunctionOnWorkerLeader(tenant, namespace, functionName, uploadedInputStream,
                 delete, uri.getRequestUri(), clientAppId());
     }

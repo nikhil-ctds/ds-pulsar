@@ -397,7 +397,7 @@ public abstract class ComponentImpl {
                 newVersionedMetaData.getFunctionDetails().getNamespace(),
                 newVersionedMetaData.getFunctionDetails().getName(),
                 newVersionedMetaData, true,
-                String.format("Error deleting {} @ /{}/{}/{}",
+                String.format("Error deleting %s @ /%s/%s/%s",
                         ComponentTypeUtils.toString(componentType), tenant, namespace, componentName));
 
         // clean up component files stored in BK
@@ -1564,7 +1564,10 @@ public abstract class ComponentImpl {
     private void internalProcessFunctionRequest(final String tenant, final String namespace, final String functionName,
                                                 final FunctionMetaData functionMetadata, boolean delete, String errorMsg) {
         try {
-            if (worker().getLeaderService().isLeader()) {
+            boolean isLeader = worker().getLeaderService().isLeader();
+            log.info("internalProcessFunctionRequest {} {} {} {} delete={} isLeader={}", tenant, namespace, functionName,
+                    functionMetadata, delete, isLeader);
+            if (isLeader) {
                 worker().getFunctionMetaDataManager().updateFunctionOnLeader(functionMetadata, delete);
             } else {
                 FunctionsImpl functions = (FunctionsImpl) worker().getFunctionAdmin().functions();

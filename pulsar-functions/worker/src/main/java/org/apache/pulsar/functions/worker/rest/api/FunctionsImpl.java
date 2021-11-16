@@ -248,7 +248,7 @@ public class FunctionsImpl extends ComponentImpl {
                                final String clientRole,
                                AuthenticationDataHttps clientAuthenticationDataHttps,
                                UpdateOptions updateOptions) {
-
+        log.info("updateFunction {} {} {}", tenant, namespace, functionName);
         if (!isWorkerServiceAvailable()) {
             throwUnavailableException();
         }
@@ -685,14 +685,18 @@ public class FunctionsImpl extends ComponentImpl {
             throw new RestException(Response.Status.BAD_REQUEST, "Corrupt Function MetaData");
         }
 
+        log.info("updateFunctionOnWorkerLeader leader={}", worker().getLeaderService().isLeader());
         // Redirect if we are not the leader
         if (!worker().getLeaderService().isLeader()) {
             WorkerInfo workerInfo = worker().getMembershipManager().getLeader();
+            log.info("currentLeader is {}", workerInfo);
+            log.info("local worker id is {}", worker().getWorkerConfig().getWorkerId());
             if (workerInfo.getWorkerId().equals(worker().getWorkerConfig().getWorkerId())) {
                 throw new RestException(Response.Status.SERVICE_UNAVAILABLE,
                         "Leader not yet ready. Please retry again");
             }
             URI redirect = UriBuilder.fromUri(uri).host(workerInfo.getWorkerHostname()).port(workerInfo.getPort()).build();
+            log.info("redirect to {}", redirect);
             throw new WebApplicationException(Response.temporaryRedirect(redirect).build());
         }
 

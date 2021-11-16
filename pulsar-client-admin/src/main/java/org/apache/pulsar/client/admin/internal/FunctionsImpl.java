@@ -62,6 +62,7 @@ import org.asynchttpclient.AsyncHandler;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.HttpResponseBodyPart;
 import org.asynchttpclient.HttpResponseStatus;
+import org.asynchttpclient.Request;
 import org.asynchttpclient.RequestBuilder;
 import org.asynchttpclient.request.body.multipart.ByteArrayPart;
 import org.asynchttpclient.request.body.multipart.FilePart;
@@ -1066,10 +1067,14 @@ public class FunctionsImpl extends ComponentResource implements Functions {
                             .path(function).getUri().toASCIIString())
                             .addBodyPart(new ByteArrayPart("functionMetaData", functionMetaData))
                     .addBodyPart(new StringPart("delete", Boolean.toString(delete)));
-
-            asyncHttpClient.executeRequest(addAuthHeaders(functions, builder).build())
+            final Request req = addAuthHeaders(functions, builder).build();
+            log.info("updateOnWorkerLeaderAsync {} {} {} delete={} request={}",
+                    tenant, namespace, function, delete, req);
+            asyncHttpClient.executeRequest(req)
                     .toCompletableFuture()
                     .thenAccept(response -> {
+                        log.info("updateOnWorkerLeaderAsync {} {} {} delete={} response {}",
+                                tenant, namespace, function, delete, response);
                         if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                             future.completeExceptionally(
                                     getApiException(Response
@@ -1081,6 +1086,8 @@ public class FunctionsImpl extends ComponentResource implements Functions {
                         }
                     })
                     .exceptionally(throwable -> {
+                        log.error("updateOnWorkerLeaderAsync {} {} {} delete={} ",
+                                tenant, namespace, function, delete, throwable);
                         future.completeExceptionally(getApiException(throwable));
                         return null;
                     });

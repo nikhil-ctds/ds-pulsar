@@ -24,6 +24,7 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Example;
 import io.swagger.annotations.ExampleProperty;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.admin.AdminResource;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.functions.FunctionConfig;
@@ -52,7 +53,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.function.Supplier;
-
+@Slf4j
 public class FunctionsBase extends AdminResource implements Supplier<WorkerService> {
 
     private final FunctionsImpl functions;
@@ -709,7 +710,7 @@ public class FunctionsBase extends AdminResource implements Supplier<WorkerServi
                                                  final @PathParam("functionName") String functionName,
                                                  final @FormDataParam("functionMetaData") InputStream uploadedInputStream,
                                                  final @FormDataParam("delete") boolean delete) {
-
+        log.info("updateFunctionOnWorkerLeader {} {} {} {}", tenant, namespace, functionName, delete);
         functions.updateFunctionOnWorkerLeader(tenant, namespace, functionName, uploadedInputStream,
                 delete, uri.getRequestUri(), clientAppId());
     }
