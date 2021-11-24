@@ -398,8 +398,7 @@ public class PersistentTopicTest extends MockedBookKeeperTestCase {
 
         // 4. Try to remove with unequal producer
         Producer producerCopy = new Producer(topic, serverCnx, 1 /* producer id */, "prod-name",
-                role, false, null, SchemaVersion.Latest, 0, false,
-                ProducerAccessMode.Shared, Optional.empty());
+                role, false, null, SchemaVersion.Latest, 0, false);
         topic.removeProducer(producerCopy);
         // Expect producer to be in map
         assertEquals(topic.getProducers().size(), 1);
