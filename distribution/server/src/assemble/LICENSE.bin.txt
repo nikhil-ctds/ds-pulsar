@@ -323,8 +323,8 @@ The Apache Software License, Version 2.0
  * Caffeine -- com.github.ben-manes.caffeine-caffeine-2.6.2.jar
  * Joda -- org.joda-joda-convert-2.2.1.jar
  * Conscrypt -- org.conscrypt-conscrypt-openjdk-uber-2.5.2.jar
- * Proto Google Common Protos -- com.google.api.grpc-proto-google-common-protos-1.17.0.jar
- * Bitbucket -- org.bitbucket.b_c-jose4j-0.7.6.jar
+ * Proto Google Common Protos -- com.google.api.grpc-proto-google-common-protos-1.12.0.jar
+ * Bitbucket -- org.bitbucket.b_c-jose4j-0.7.2.jar
  * Gson
     - com.google.code.gson-gson-2.8.6.jar
     - io.gsonfire-gson-fire-1.8.4.jar
@@ -356,7 +356,7 @@ The Apache Software License, Version 2.0
     - commons-logging-commons-logging-1.1.1.jar
     - org.apache.commons-commons-collections4-4.1.jar
     - org.apache.commons-commons-compress-1.19.jar
-    - org.apache.commons-commons-lang3-3.9.jar
+    - org.apache.commons-commons-lang3-3.6.jar
  * Netty
     - io.netty-netty-buffer-4.1.60.Final.jar
     - io.netty-netty-codec-4.1.60.Final.jar
@@ -469,9 +469,6 @@ The Apache Software License, Version 2.0
     - io.grpc-grpc-protobuf-lite-1.18.0.jar
     - io.grpc-grpc-stub-1.18.0.jar
     - io.grpc-grpc-protobuf-nano-1.18.0.jar
-    - io.grpc-grpc-testing-1.18.0.jar
-  * Perfmark
-    - io.perfmark-perfmark-api-0.19.0.jar
   * OpenCensus
     - io.opencensus-opencensus-api-0.18.0.jar
     - io.opencensus-opencensus-contrib-grpc-metrics-0.18.0.jar
@@ -574,16 +571,10 @@ CDDL-1.1 -- licenses/LICENSE-CDDL-1.1.txt
  * Mimepull -- org.jvnet.mimepull-mimepull-1.9.13.jar
 
 Eclipse Distribution License 1.0 -- licenses/LICENSE-EDL-1.0.txt
-<<<<<<< HEAD
  * Jakarta Activation -- com.sun.activation-jakarta.activation-1.2.2.jar
  * Jakarta XML Binding
     - jakarta.activation-jakarta.activation-api-1.2.2.jar
     - jakarta.xml.bind-jakarta.xml.bind-api-2.3.3.jar
-=======
- * Jakarta Activation
-   - jakarta.activation-jakarta.activation-api-1.2.1.jar
- * Jakarta XML Binding -- jakarta.xml.bind-jakarta.xml.bind-api-2.3.2.jar
->>>>>>> 9d3cbef9b01... [Security] Upgrade junit version to 4.13.1 to resolve CVE-2020-15250 and fix test dependency leak (#10147)
 
 Eclipse Public License 1.0 -- licenses/LICENSE-AspectJ.txt
  * AspectJ
