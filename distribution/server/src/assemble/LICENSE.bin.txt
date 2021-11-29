@@ -517,18 +517,7 @@ The Apache Software License, Version 2.0
     - io.vertx-vertx-web-3.9.7.jar
     - io.vertx-vertx-web-common-3.9.7.jar
   * Apache ZooKeeper
-<<<<<<< HEAD
     - org.apache.zookeeper-zookeeper-jute-3.5.7.jar
-=======
-    - org.apache.zookeeper-zookeeper-jute-3.6.2.jar
-  * Snappy Java
-    - org.xerial.snappy-snappy-java-1.1.7.jar
-  * Google HTTP Client
-    - com.google.http-client-google-http-client-jackson2-1.34.0.jar
-    - com.google.http-client-google-http-client-1.34.0.jar
-    - com.google.auto.value-auto-value-annotations-1.7.jar
-    - com.google.re2j-re2j-1.2.jar
->>>>>>> 9d3cbef9b01... [Security] Upgrade junit version to 4.13.1 to resolve CVE-2020-15250 and fix test dependency leak (#10147)
 
 BSD 3-clause "New" or "Revised" License
  * Google auth library
