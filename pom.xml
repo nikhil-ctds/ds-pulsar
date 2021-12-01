@@ -33,7 +33,7 @@
 
 
   <artifactId>pulsar</artifactId>
-  <version>2.7.2.1.1.15</version>
+  <version>2.7.2.1.1.16-SNAPSHOT</version>
   <name>Pulsar</name>
   <description>Pulsar is a distributed pub-sub messaging platform with a very
 flexible messaging model and an intuitive client API.</description>
