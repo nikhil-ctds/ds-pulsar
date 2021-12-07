@@ -27,9 +27,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.ws.rs.ClientErrorException;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.InvocationCallback;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.GenericType;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import lombok.extern.slf4j.Slf4j;
@@ -241,5 +243,25 @@ public class WorkerImpl extends BaseResource implements Worker {
                     }
                 });
         return future;
+    }
+
+    @Override
+    public void rebalance() throws PulsarAdminException {
+        try {
+            rebalanceAsync().get(this.readTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (ExecutionException e) {
+            throw (PulsarAdminException) e.getCause();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new PulsarAdminException(e);
+        } catch (TimeoutException e) {
+            throw new PulsarAdminException.TimeoutException(e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Void> rebalanceAsync() {
+        final WebTarget path = worker.path("rebalance");
+        return asyncPutRequest(path,  Entity.entity("", MediaType.APPLICATION_JSON));
     }
 }
