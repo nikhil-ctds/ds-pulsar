@@ -212,6 +212,8 @@ public class EntryCacheImpl implements EntryCache {
                     (ledgerEntries, exception) -> {
                         if (exception != null) {
                             ml.invalidateLedgerHandle(lh);
+                            log.error("ReadEntry failed from ledger {} at position {}, callback {}",
+                                                lh.getId(), position, callback, exception);
                             callback.readEntryFailed(createManagedLedgerException(exception), ctx);
                             return;
                         }
@@ -303,6 +305,8 @@ public class EntryCacheImpl implements EntryCache {
                                 && ((BKException)exception).getCode() == BKException.Code.TooManyRequestsException) {
                                 callback.readEntriesFailed(createManagedLedgerException(exception), ctx);
                             } else {
+                                log.error("asyncReadEntry0 failed from ledger {} at firstEntry {} lastEntry {}, callback {}",
+                                        lh.getId(), firstEntry, lastEntry, callback, exception);
                                 ml.invalidateLedgerHandle(lh);
                                 ManagedLedgerException mlException = createManagedLedgerException(exception);
                                 callback.readEntriesFailed(mlException, ctx);

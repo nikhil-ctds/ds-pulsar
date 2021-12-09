@@ -1588,6 +1588,10 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
 
             @Override
             public void readEntryFailed(ManagedLedgerException exception, Object ctx) {
+                log.error("Cannot read entry at {}, topic {}, " +
+                        "markDeletePosition {}, partitionIndex {}," +
+                        "subscriptionName {}", position, topic.getName(),
+                        markDeletePosition, partitionIndex, subscriptionName, exception);
                 entryFuture.completeExceptionally(exception);
             }
         }, null);
