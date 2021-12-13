@@ -1325,6 +1325,11 @@ public class NamespaceService {
         }
     }
 
+    public static boolean isSystemServiceNamespace(String namespace) {
+        return HEARTBEAT_NAMESPACE_PATTERN.matcher(namespace).matches()
+                || SLA_NAMESPACE_PATTERN.matcher(namespace).matches();
+    }
+
     public boolean registerSLANamespace() throws PulsarServerException {
         boolean isNameSpaceRegistered = registerNamespace(getSLAMonitorNamespace(host, config), false);
         if (isNameSpaceRegistered) {

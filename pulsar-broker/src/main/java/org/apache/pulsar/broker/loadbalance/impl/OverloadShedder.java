@@ -18,8 +18,6 @@
  */
 package org.apache.pulsar.broker.loadbalance.impl;
 
-import static org.apache.pulsar.broker.namespace.NamespaceService.HEARTBEAT_NAMESPACE_PATTERN;
-import static org.apache.pulsar.broker.namespace.NamespaceService.HEARTBEAT_NAMESPACE_PATTERN_V2;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 
@@ -99,10 +97,8 @@ public class OverloadShedder implements LoadSheddingStrategy {
             if (localData.getBundles().size() > 1) {
                 // Sort bundles by throughput, then pick the biggest N which combined make up for at least the minimum throughput to offload
 
-                loadData.getBundleData().entrySet().stream()
-                    .filter(e -> !HEARTBEAT_NAMESPACE_PATTERN.matcher(e.getKey()).matches()
-                            && !HEARTBEAT_NAMESPACE_PATTERN_V2.matcher(e.getKey()).matches()
-                            && localData.getBundles().contains(e.getKey()))
+                loadData.getBundleDataForLoadShedding().entrySet().stream()
+                    .filter(e -> localData.getBundles().contains(e.getKey()))
                     .map((e) -> {
                         // Map to throughput value
                         // Consider short-term byte rate to address system resource burden
