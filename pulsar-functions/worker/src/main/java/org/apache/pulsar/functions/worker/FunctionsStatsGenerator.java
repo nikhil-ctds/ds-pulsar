@@ -65,14 +65,14 @@ public class FunctionsStatsGenerator {
 
                 if (functionRuntimeSpawner != null) {
                     Runtime functionRuntime = functionRuntimeSpawner.getRuntime();
-                    if (functionRuntime != null) {
+                    if (functionRuntime != null && functionRuntime.isAlive()) {
                         try {
 
                             out.write(functionRuntime.getPrometheusMetrics());
 
                         } catch (IOException e) {
                             log.warn("Failed to collect metrics for function instance {}",
-                                    fullyQualifiedInstanceName, e);
+                                    fullyQualifiedInstanceName, e + ""); // no stacktrace
                         }
                     }
                 }

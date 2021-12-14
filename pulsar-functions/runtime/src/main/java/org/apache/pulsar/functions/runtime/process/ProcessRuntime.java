@@ -390,16 +390,21 @@ class ProcessRuntime implements Runtime {
     }
 
     private void tryExtractingDeathException() {
-        InputStream errorStream = process.getErrorStream();
-        try {
-            byte[] errorBytes = new byte[errorStream.available()];
-            errorStream.read(errorBytes);
-            String errorMessage = new String(errorBytes);
-            deathException = new RuntimeException(errorMessage);
-            log.error("Extracted Process death exception", deathException);
-        } catch (Exception ex) {
-            deathException = ex;
-            log.error("Error extracting Process death exception", deathException);
+        if (process != null && deathException == null) {
+            InputStream errorStream = process.getErrorStream();
+            try {
+                byte[] errorBytes = new byte[errorStream.available()];
+                errorStream.read(errorBytes);
+                String errorMessage = new String(errorBytes);
+                deathException = new RuntimeException(errorMessage);
+                log.error("Extracted Process death exception for {}", FunctionCommon.getFullyQualifiedInstanceId(
+                        instanceConfig.getFunctionDetails().getTenant(),
+                        instanceConfig.getFunctionDetails().getNamespace(),
+                        instanceConfig.getFunctionDetails().getName(), instanceConfig.getInstanceId()), deathException);
+            } catch (Exception ex) {
+                deathException = ex;
+                log.error("Error extracting Process death exception", deathException);
+            }
         }
     }
 }
