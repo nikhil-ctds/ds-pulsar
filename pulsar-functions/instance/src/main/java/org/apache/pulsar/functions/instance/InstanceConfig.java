@@ -22,6 +22,9 @@ import lombok.Data;
 import org.apache.pulsar.functions.proto.Function;
 import org.apache.pulsar.functions.proto.Function.FunctionDetails;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * This is the config passed to the Java Instance. Contains all the information
  * passed to run functions.
@@ -39,6 +42,7 @@ public class InstanceConfig {
     // Max pending async requests per instance to avoid large number of concurrent requests.
     // Only used in AsyncFunction. Default: 1000
     private int maxPendingAsyncRequests = 1000;
+    private List<String> additionalJavaRuntimeArguments = Collections.emptyList();
 
     /**
      * Get the string representation of {@link #getInstanceId()}.

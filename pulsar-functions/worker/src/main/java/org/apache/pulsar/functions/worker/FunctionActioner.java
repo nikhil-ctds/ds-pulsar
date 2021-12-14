@@ -189,6 +189,9 @@ public class FunctionActioner {
         instanceConfig.setClusterName(clusterName);
         instanceConfig.setFunctionAuthenticationSpec(functionAuthSpec);
         instanceConfig.setMaxPendingAsyncRequests(workerConfig.getMaxPendingAsyncRequests());
+        if (workerConfig.getAdditionalJavaRuntimeArguments() != null) {
+            instanceConfig.setAdditionalJavaRuntimeArguments(workerConfig.getAdditionalJavaRuntimeArguments());
+        }
         return instanceConfig;
     }
 
