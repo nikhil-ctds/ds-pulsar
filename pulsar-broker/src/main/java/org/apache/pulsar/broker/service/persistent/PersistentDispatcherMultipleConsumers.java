@@ -500,10 +500,6 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
     }
 
     protected void sendMessagesToConsumers(ReadType readType, List<Entry> entries) {
-
-        if (entries == null || entries.size() == 0) {
-            return;
-        }
         if (needTrimAckedMessages()) {
             cursor.trimDeletedEntries(entries);
         }
