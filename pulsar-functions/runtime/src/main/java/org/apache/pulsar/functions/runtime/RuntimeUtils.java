@@ -318,6 +318,13 @@ public class RuntimeUtils {
                     "%s-%s",
                     instanceConfig.getFunctionDetails().getName(),
                     shardId));
+
+            args.add("-Dio.netty.tryReflectionSetAccessible=true");
+
+            if (instanceConfig.getAdditionalJavaRuntimeArguments() != null) {
+                args.addAll(instanceConfig.getAdditionalJavaRuntimeArguments());
+            }
+
             if (!isEmpty(instanceConfig.getFunctionDetails().getRuntimeFlags())) {
                 for (String runtimeFlagArg : splitRuntimeArgs(instanceConfig.getFunctionDetails().getRuntimeFlags())) {
                     args.add(runtimeFlagArg);
