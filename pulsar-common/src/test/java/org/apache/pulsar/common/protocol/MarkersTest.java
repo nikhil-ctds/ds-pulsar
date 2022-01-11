@@ -139,14 +139,6 @@ public class MarkersTest {
         }
 
         ByteBuf buf = Markers.newTxnCommitMarker(sequenceId, mostBits, leastBits, messageIdDataList);
-        for (MessageIdData messageIdData : messageIdDataList) {
-            try {
-                messageIdData.recycle();
-                fail("message id data should be recycled after create the marker bytebuf.");
-            } catch (Exception e) {
-                assertTrue(e instanceof java.lang.IllegalStateException);
-            }
-        }
         MessageMetadata msgMetadata = Commands.parseMessageMetadata(buf);
 
         assertEquals(msgMetadata.getMarkerType(), PulsarMarkers.MarkerType.TXN_COMMIT_VALUE);
