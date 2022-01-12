@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
+import org.apache.pulsar.broker.admin.impl.BrokersBase;
 import com.google.common.collect.Sets;
 import org.apache.pulsar.broker.cache.LocalZooKeeperCacheService;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -542,5 +542,52 @@ public class InactiveTopicDeleteTest extends BrokerTestBase {
         Awaitility.await().atMost(5, TimeUnit.SECONDS).untilAsserted(()
                 -> Assert.assertFalse(admin.topics().getList(namespace).contains(topic3)));
         Assert.assertFalse(admin.topics().getList(namespace).contains(topic));
+    }
+
+    @Test(timeOut = 30000)
+    public void testInternalTopicInactiveNotClean() throws Exception {
+        conf.setSystemTopicEnabled(true);
+        conf.setBrokerDeleteInactiveTopicsMode(InactiveTopicDeleteMode.delete_when_no_subscriptions);
+        conf.setBrokerDeleteInactiveTopicsFrequencySeconds(1);
+        super.baseSetup();
+        // init topic
+        final String healthCheckTopic = "persistent://prop/ns-abc/" + BrokersBase.HEALTH_CHECK_TOPIC_SUFFIX;
+        final String topic = "persistent://prop/ns-abc/testDeleteWhenNoSubscriptions";
+
+        Producer<byte[]> producer = pulsarClient.newProducer()
+                .topic(topic)
+                .create();
+        Consumer<byte[]> consumer = pulsarClient.newConsumer()
+                .topic(topic)
+                .subscriptionName("sub")
+                .subscribe();
+
+        Producer<byte[]> heathCheckProducer = pulsarClient.newProducer()
+                .topic(healthCheckTopic)
+                .create();
+        Consumer<byte[]> heathCheckConsumer = pulsarClient.newConsumer()
+                .topic(healthCheckTopic)
+                .subscriptionName("healthCheck")
+                .subscribe();
+
+        consumer.close();
+        producer.close();
+        heathCheckConsumer.close();
+        heathCheckProducer.close();
+
+        Awaitility.await().untilAsserted(() -> Assert.assertTrue(admin.topics().getList("prop/ns-abc")
+                .contains(topic)));
+        Awaitility.await().untilAsserted(() -> {
+            Assert.assertTrue(admin.topics().getList("prop/ns-abc").contains(healthCheckTopic));
+        });
+
+        admin.topics().deleteSubscription(topic, "sub");
+        admin.topics().deleteSubscription(healthCheckTopic, "healthCheck");
+
+        Awaitility.await().untilAsserted(() -> Assert.assertFalse(admin.topics().getList("prop/ns-abc")
+                .contains(topic)));
+        Awaitility.await().pollDelay(2, TimeUnit.SECONDS)
+                .untilAsserted(() -> Assert.assertTrue(admin.topics().getList("prop/ns-abc")
+                        .contains(healthCheckTopic)));
     }
 }

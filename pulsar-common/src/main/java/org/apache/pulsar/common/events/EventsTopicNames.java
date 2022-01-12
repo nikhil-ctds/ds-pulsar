@@ -18,6 +18,8 @@
  */
 package org.apache.pulsar.common.events;
 
+import org.apache.pulsar.common.naming.TopicName;
+
 /**
  * System topic name for the event type.
  */
@@ -29,4 +31,7 @@ public class EventsTopicNames {
      */
     public static final String NAMESPACE_EVENTS_LOCAL_NAME = "__change_events";
 
+    public static boolean checkTopicIsEventsNames(TopicName topicName) {
+        return NAMESPACE_EVENTS_LOCAL_NAME.equals(TopicName.get(topicName.getPartitionedTopicName()).getLocalName());
+    }
 }

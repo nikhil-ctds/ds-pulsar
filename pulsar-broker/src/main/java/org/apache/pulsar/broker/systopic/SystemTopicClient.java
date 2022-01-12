@@ -18,11 +18,14 @@
  */
 package org.apache.pulsar.broker.systopic;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.broker.admin.impl.BrokersBase;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.common.events.EventsTopicNames;
 import org.apache.pulsar.common.events.PulsarEvent;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 
 import java.io.IOException;
@@ -169,7 +172,23 @@ public interface SystemTopicClient {
     }
 
     static boolean isSystemTopic(TopicName topicName) {
-        return EventsTopicNames.NAMESPACE_EVENTS_LOCAL_NAME.equals(topicName.getLocalName());
+        if (topicName.getNamespaceObject().equals(NamespaceName.SYSTEM_NAMESPACE)) {
+            return true;
+        }
+
+        TopicName nonePartitionedTopicName = TopicName.get(topicName.getPartitionedTopicName());
+
+        // event topic
+        if (EventsTopicNames.checkTopicIsEventsNames(nonePartitionedTopicName)) {
+            return true;
+        }
+
+        String localName = nonePartitionedTopicName.getLocalName();
+        // health check topic
+        if (StringUtils.endsWith(localName, BrokersBase.HEALTH_CHECK_TOPIC_SUFFIX)){
+            return true;
+        }
+        return false;
     }
 
 }

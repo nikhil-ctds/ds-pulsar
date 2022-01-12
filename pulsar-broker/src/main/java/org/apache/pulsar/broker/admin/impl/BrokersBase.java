@@ -81,6 +81,7 @@ import io.swagger.annotations.ApiResponses;
 public class BrokersBase extends AdminResource {
     private static final Logger LOG = LoggerFactory.getLogger(BrokersBase.class);
     private int serviceConfigZkVersion = -1;
+    public static final String HEALTH_CHECK_TOPIC_SUFFIX = "healthcheck";
     // log a full thread dump when a deadlock is detected in healthcheck once every 10 minutes
     // to prevent excessive logging
     private static final long LOG_THREADDUMP_INTERVAL_WHEN_DEADLOCK_DETECTED = 600000L;
@@ -313,7 +314,7 @@ public class BrokersBase extends AdminResource {
 
         String heartbeatNamespace = NamespaceService.getHeartbeatNamespace(
                 pulsar().getAdvertisedAddress(), pulsar().getConfiguration());
-        String topic = String.format("persistent://%s/healthcheck", heartbeatNamespace);
+        String topic = String.format("persistent://%s/%s", heartbeatNamespace, HEALTH_CHECK_TOPIC_SUFFIX);
 
         PulsarClient client = pulsar().getClient();
 
