@@ -534,6 +534,20 @@ public class ProxyConfiguration implements PulsarConfiguration {
     )
     private int httpNumThreads = Math.max(8, 2 * Runtime.getRuntime().availableProcessors());
 
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            doc = "Number of threads to use for Netty IO."
+                    + " Default is set to `2 * Runtime.getRuntime().availableProcessors()`"
+    )
+    private int numIOThreads = 2 * Runtime.getRuntime().availableProcessors();
+
+    @FieldContext(
+            category = CATEGORY_SERVER,
+            doc = "Number of threads to use for Netty Acceptor."
+                    + " Default is set to `1`"
+    )
+    private int numAcceptorThreads = 1;
+
     @FieldContext(category = CATEGORY_SERVER, doc = "Max concurrent web requests")
     private int maxConcurrentHttpRequests = 1024;
 
