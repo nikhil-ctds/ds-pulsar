@@ -30,18 +30,12 @@ import java.util.function.Predicate;
  */
 public interface Transformation<T> extends Predicate<Record<T>>, Closeable {
 
-    enum Type {
-        KEY,
-        VALUE;
-    }
-
-    Type type();
-
+    /**
+     * Initialize the transformation with its configuration
+     * @param config
+     * @throws Exception
+     */
     void init(final Map<String, Object> config) throws Exception;
 
     Record<T> apply(Record<T> record);
-
-    /** Signal that this transformation instance will no longer will be used. **/
-    @Override
-    void close();
 }

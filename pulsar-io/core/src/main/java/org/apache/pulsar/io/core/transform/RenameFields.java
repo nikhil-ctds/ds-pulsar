@@ -17,7 +17,6 @@ import java.util.stream.Collectors;
 public class RenameFields implements Transformation<Object> {
     private static final Logger LOG = LoggerFactory.getLogger(RenameFields.class);
 
-    Transformation.Type type = Type.VALUE;
     List<String> sources = new ArrayList<>();
     List<String> targets = new ArrayList<>();
 
@@ -35,14 +34,14 @@ public class RenameFields implements Transformation<Object> {
     {
         private final Record record;
         private final Schema schema;
+        private final Optional<String> key;
         private final Object value;
-        private final Type type;
 
-        public MyRecord(Record record, Schema schema, Object value, Type type) {
+        public MyRecord(Record record, Schema schema, Optional<String> key, Object value) {
             this.record = record;
             this.schema = schema;
+            this.key = key;
             this.value = value;
-            this.type = type;
         }
 
         @Override
@@ -52,7 +51,7 @@ public class RenameFields implements Transformation<Object> {
 
         @Override
         public Optional<String> getKey() {
-            return type.equals(Type.KEY) ? Optional.of((String)value) : record.getKey();
+            return key;
         }
 
         public Schema getSchema() {
@@ -61,7 +60,7 @@ public class RenameFields implements Transformation<Object> {
 
         @Override
         public Object getValue() {
-            return type.equals(Type.VALUE) ? value : record.getValue();
+            return value;
         }
 
         /**
@@ -98,16 +97,8 @@ public class RenameFields implements Transformation<Object> {
     SchemaAndVersion lastSchemaAndVersion;
 
     @Override
-    public Type type() {
-        return type;
-    }
-
-    @Override
     public void init(Map<String, Object> config) throws Exception
     {
-        if (config.containsKey("type") && ((String)config.get("type")).equalsIgnoreCase("key")) {
-            type = Type.KEY;
-        }
         if (config.containsKey("renames")) {
             for(String rename : ((String)config.get("renames")).split(",")) {
                 String[] parts = rename.split(":");
@@ -117,7 +108,7 @@ public class RenameFields implements Transformation<Object> {
                 }
             }
         }
-        LOG.debug("type={} sources={} targets={}", type, sources, targets);
+        LOG.debug("rename sources={} targets={}", sources, targets);
     }
 
     /**
@@ -215,7 +206,7 @@ public class RenameFields implements Transformation<Object> {
     @Override
     public Record apply(Record<Object> record) {
         //  update the local schema if obsolete
-        Object object = type.equals(Type.VALUE) ? record.getValue() : record.getKey();
+        Object object = record.getValue();
         if (object  instanceof GenericData.Record) {
             GenericData.Record input = (GenericData.Record) object;
             org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(input.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
@@ -227,7 +218,7 @@ public class RenameFields implements Transformation<Object> {
                     props.put(targets.get(i), value);
             }
             org.apache.avro.generic.GenericRecord outGenericRecord = rebuidRecord(avroSchema, new LinkedList<>(props.entrySet()), "");
-            return new MyRecord(record, new AvroSchemaWrapper(avroSchema), outGenericRecord, type);
+            return new MyRecord(record, new AvroSchemaWrapper(avroSchema), record.getKey(), outGenericRecord);
         }
         return record;
     }

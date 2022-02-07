@@ -19,9 +19,9 @@ public class RenameFieldTests
         Optional<String> key;
         Object value;
 
-        TestRecord(Schema schema, String key, Object value) {
+        TestRecord(Schema schema, Optional<String> key, Object value) {
             this.schema = schema;
-            this.key = Optional.ofNullable(key);
+            this.key = key;
             this.value = value;
         }
 
@@ -73,7 +73,7 @@ public class RenameFieldTests
         genericRecord.put("x", genericRecordX);
         genericRecord.put("y", genericRecordY);
 
-        TestRecord testRecord = new TestRecord(new AvroSchemaWrapper(rootSchema), "key1", genericRecord);
+        TestRecord testRecord = new TestRecord(new AvroSchemaWrapper(rootSchema), Optional.of("key1"), genericRecord);
         RenameFields renameFields = new RenameFields();
         renameFields.init(ImmutableMap.of("type","value","renames","a:b,x.x1:x.xx1"));
         Record result = renameFields.apply(testRecord);
