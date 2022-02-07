@@ -34,6 +34,7 @@ import org.apache.pulsar.common.functions.Resources;
 import org.apache.pulsar.common.io.BatchSourceConfig;
 import org.apache.pulsar.common.io.ConnectorDefinition;
 import org.apache.pulsar.common.io.SourceConfig;
+import org.apache.pulsar.common.io.TransformationConfig;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.nar.NarClassLoader;
@@ -48,7 +49,9 @@ import org.apache.pulsar.io.core.Source;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
@@ -120,6 +123,8 @@ public class SourceConfigUtils {
 
         sourceSpecBuilder.setConfigs(new Gson().toJson(configs));
 
+        if (sourceConfig.getTransformations() != null && !sourceConfig.getTransformations().isEmpty())
+            sourceSpecBuilder.setTransformationConfigs((new Gson().toJson(sourceConfig.getTransformations())));
 
         if (sourceConfig.getSecrets() != null && !sourceConfig.getSecrets().isEmpty()) {
             functionDetailsBuilder.setSecretsMap(new Gson().toJson(sourceConfig.getSecrets()));
@@ -406,6 +411,9 @@ public class SourceConfigUtils {
         }
         if (newConfig.getConfigs() != null) {
             mergedConfig.setConfigs(newConfig.getConfigs());
+        }
+        if (newConfig.getTransformations() != null) {
+            mergedConfig.setTransformations(newConfig.getTransformations());
         }
         if (newConfig.getSecrets() != null) {
             mergedConfig.setSecrets(newConfig.getSecrets());

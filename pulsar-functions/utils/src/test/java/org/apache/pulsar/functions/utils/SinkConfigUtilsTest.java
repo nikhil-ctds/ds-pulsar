@@ -18,6 +18,7 @@
  */
 package org.apache.pulsar.functions.utils;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -27,6 +28,7 @@ import org.apache.pulsar.common.functions.FunctionConfig;
 import org.apache.pulsar.common.functions.Resources;
 import org.apache.pulsar.common.io.ConnectorDefinition;
 import org.apache.pulsar.common.io.SinkConfig;
+import org.apache.pulsar.common.io.TransformationConfig;
 import org.apache.pulsar.common.nar.NarClassLoader;
 import org.apache.pulsar.common.nar.NarUnpacker;
 import org.apache.pulsar.common.util.Reflections;
@@ -34,6 +36,7 @@ import org.apache.pulsar.config.validation.ConfigValidationAnnotations;
 import org.apache.pulsar.functions.api.utils.IdentityFunction;
 import org.apache.pulsar.functions.proto.Function;
 import org.apache.pulsar.functions.utils.io.ConnectorUtils;
+import org.apache.pulsar.io.core.transform.RenameFields;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
@@ -44,9 +47,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.apache.pulsar.common.functions.FunctionConfig.ProcessingGuarantees.EFFECTIVELY_ONCE;
 import static org.mockito.ArgumentMatchers.any;
@@ -219,6 +220,25 @@ public class SinkConfigUtilsTest extends PowerMockTestCase {
     }
 
     @Test
+    public void testMergeDifferentTransformationConfig() {
+        SinkConfig sinkConfig = createSinkConfig();
+        List<String> myTransformations = new LinkedList<>();
+        TransformationConfig transformationConfig = new TransformationConfig("myclassname", ImmutableMap.of("MyKey", "MyValue"));
+        myTransformations.add(new Gson().toJson(transformationConfig));
+        SinkConfig newSinkConfig = createUpdatedSinkConfig("transformations", myTransformations);
+        SinkConfig mergedConfig = SinkConfigUtils.validateUpdate(sinkConfig, newSinkConfig);
+        assertEquals(
+                mergedConfig.getTransformations(),
+                myTransformations
+        );
+        mergedConfig.setTransformations(sinkConfig.getTransformations());
+        assertEquals(
+                new Gson().toJson(sinkConfig),
+                new Gson().toJson(mergedConfig)
+        );
+    }
+
+    @Test
     public void testMergeDifferentSecrets() {
         SinkConfig sinkConfig = createSinkConfig();
         Map<String, String> mySecrets = new HashMap<>();
@@ -358,6 +378,7 @@ public class SinkConfigUtilsTest extends PowerMockTestCase {
         sinkConfig.setProcessingGuarantees(FunctionConfig.ProcessingGuarantees.ATLEAST_ONCE);
         sinkConfig.setRetainOrdering(false);
         sinkConfig.setConfigs(new HashMap<>());
+        sinkConfig.setTransformations(new LinkedList<>());
         sinkConfig.setAutoAck(true);
         sinkConfig.setTimeoutMs(2000l);
         sinkConfig.setArchive("DummyArchive.nar");

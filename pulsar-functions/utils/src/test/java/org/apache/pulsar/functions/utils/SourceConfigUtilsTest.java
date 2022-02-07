@@ -18,6 +18,7 @@
  */
 package org.apache.pulsar.functions.utils;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,9 +26,7 @@ import lombok.experimental.Accessors;
 import org.apache.pulsar.common.functions.FunctionConfig;
 import org.apache.pulsar.common.functions.ProducerConfig;
 import org.apache.pulsar.common.functions.Resources;
-import org.apache.pulsar.common.io.BatchSourceConfig;
-import org.apache.pulsar.common.io.ConnectorDefinition;
-import org.apache.pulsar.common.io.SourceConfig;
+import org.apache.pulsar.common.io.*;
 import org.apache.pulsar.common.nar.NarClassLoader;
 import org.apache.pulsar.common.nar.NarUnpacker;
 import org.apache.pulsar.common.util.Reflections;
@@ -36,6 +35,7 @@ import org.apache.pulsar.functions.proto.Function;
 import org.apache.pulsar.functions.utils.io.ConnectorUtils;
 import org.apache.pulsar.io.core.BatchSourceTriggerer;
 import org.apache.pulsar.io.core.SourceContext;
+import org.apache.pulsar.io.core.transform.RenameFields;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
@@ -46,9 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static org.apache.pulsar.common.functions.FunctionConfig.ProcessingGuarantees.EFFECTIVELY_ONCE;
@@ -204,6 +202,26 @@ public class SourceConfigUtilsTest extends PowerMockTestCase {
                 new Gson().toJson(mergedConfig)
         );
     }
+
+    @Test
+    public void testMergeDifferentTransformationConfig() {
+        SourceConfig sourceConfig = createSourceConfig();
+        List<String> myTransformations = new LinkedList<>();
+        TransformationConfig transformationConfig = new TransformationConfig("myclassname", ImmutableMap.of("MyKey", "MyValue"));
+        myTransformations.add(new Gson().toJson(transformationConfig));
+        SourceConfig newSourceConfig = createUpdatedSourceConfig("transformations", myTransformations);
+        SourceConfig mergedConfig = SourceConfigUtils.validateUpdate(sourceConfig, newSourceConfig);
+        assertEquals(
+                mergedConfig.getTransformations(),
+                myTransformations
+        );
+        mergedConfig.setTransformations(sourceConfig.getTransformations());
+        assertEquals(
+                new Gson().toJson(sourceConfig),
+                new Gson().toJson(mergedConfig)
+        );
+    }
+
 
     @Test
     public void testMergeDifferentSecrets() {

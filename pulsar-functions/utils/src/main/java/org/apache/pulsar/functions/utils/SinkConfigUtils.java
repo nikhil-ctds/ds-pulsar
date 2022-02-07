@@ -34,7 +34,6 @@ import org.apache.pulsar.common.functions.FunctionConfig;
 import org.apache.pulsar.common.functions.Resources;
 import org.apache.pulsar.common.io.ConnectorDefinition;
 import org.apache.pulsar.common.io.SinkConfig;
-import org.apache.pulsar.common.io.SourceConfig;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.nar.NarClassLoader;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
@@ -220,6 +219,9 @@ public class SinkConfigUtils {
 
         if (sinkConfig.getConfigs() != null) {
             sinkSpecBuilder.setConfigs(new Gson().toJson(sinkConfig.getConfigs()));
+        }
+        if (sinkConfig.getTransformations() != null && !sinkConfig.getTransformations().isEmpty()) {
+            sinkSpecBuilder.setTransformationConfigs(new Gson().toJson(sinkConfig.getTransformations()));
         }
         if (sinkConfig.getSecrets() != null && !sinkConfig.getSecrets().isEmpty()) {
             functionDetailsBuilder.setSecretsMap(new Gson().toJson(sinkConfig.getSecrets()));
@@ -555,6 +557,9 @@ public class SinkConfigUtils {
         }
         if (newConfig.getConfigs() != null) {
             mergedConfig.setConfigs(newConfig.getConfigs());
+        }
+        if (newConfig.getConfigs() != null) {
+            mergedConfig.setTransformations(newConfig.getTransformations());
         }
         if (newConfig.getSecrets() != null) {
             mergedConfig.setSecrets(newConfig.getSecrets());

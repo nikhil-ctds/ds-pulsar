@@ -178,12 +178,12 @@ public class RenameFields implements Transformation<Object> {
                         .collect(Collectors.toList()));
     }
 
-    TreeMap<String, Object> flatten(TreeMap<String, Object> map, String path, org.apache.avro.generic.GenericRecord genericRecord) {
+    TreeMap<String, Object> falltenRecord(TreeMap<String, Object> map, String path, org.apache.avro.generic.GenericRecord genericRecord) {
         for(org.apache.avro.Schema.Field field : genericRecord.getSchema().getFields()) {
             Object value = genericRecord.get(field.name());
             String key = path.length() > 0 ? path + "." + field.name() : field.name();
             if (value instanceof org.apache.avro.generic.GenericRecord) {
-                flatten(map, key, (org.apache.avro.generic.GenericRecord) value);
+                falltenRecord(map, key, (org.apache.avro.generic.GenericRecord) value);
             } else {
                 map.put(key, value);
             }
@@ -191,7 +191,7 @@ public class RenameFields implements Transformation<Object> {
         return map;
     }
 
-    org.apache.avro.generic.GenericRecord rebuid(org.apache.avro.Schema schema, List<Map.Entry<String, Object>> entries, String path) {
+    org.apache.avro.generic.GenericRecord rebuidRecord(org.apache.avro.Schema schema, List<Map.Entry<String, Object>> entries, String path) {
         org.apache.avro.generic.GenericRecordBuilder genericRecordBuilder = new org.apache.avro.generic.GenericRecordBuilder(schema);
         while(!entries.isEmpty()) {
             Map.Entry<String, Object> entry = entries.get(0);
@@ -202,7 +202,7 @@ public class RenameFields implements Transformation<Object> {
             if (subpath.contains(".")) {
                 // add subnode
                 String subfield = subpath.substring(0, subpath.indexOf("."));
-                genericRecordBuilder.set(subfield, rebuid(schema.getField(subfield).schema(), entries, subfield));
+                genericRecordBuilder.set(subfield, rebuidRecord(schema.getField(subfield).schema(), entries, subfield));
             } else {
                 // add field
                 entries.remove(0);
@@ -220,13 +220,13 @@ public class RenameFields implements Transformation<Object> {
             GenericData.Record input = (GenericData.Record) object;
             org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(input.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
             TreeMap props = new TreeMap<>();
-            flatten(props, "", input);
+            falltenRecord(props, "", input);
             for(int i = 0; i < sources.size(); i++) {
                 Object value = props.remove(sources.get(i));
                 if (value != null)
                     props.put(targets.get(i), value);
             }
-            org.apache.avro.generic.GenericRecord outGenericRecord = rebuid(avroSchema, new LinkedList<>(props.entrySet()), "");
+            org.apache.avro.generic.GenericRecord outGenericRecord = rebuidRecord(avroSchema, new LinkedList<>(props.entrySet()), "");
             return new MyRecord(record, new AvroSchemaWrapper(avroSchema), outGenericRecord, type);
         }
         return record;

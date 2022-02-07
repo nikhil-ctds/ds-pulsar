@@ -18,26 +18,20 @@
  */
 package org.apache.pulsar.common.io;
 
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.apache.pulsar.common.functions.FunctionConfig;
-import org.apache.pulsar.common.functions.ProducerConfig;
-import org.apache.pulsar.common.functions.Resources;
-
-import java.util.Map;
 
 /**
- * Pulsar source configuration.
+ * Pulsar transformation configuration.
  */
 @Data
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class TransformationConfig
-{
-    private String name;
+public class TransformationConfig {
     private String className;
 
     private Map<String, Object> config;
