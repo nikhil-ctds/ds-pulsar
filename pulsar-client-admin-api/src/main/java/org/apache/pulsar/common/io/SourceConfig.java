@@ -49,7 +49,7 @@ public class SourceConfig {
 
     private String schemaType;
 
-    private List<TransformationConfig> transformations;
+    private List<TransformationConfig> transformationConfigs;
 
     private Map<String, Object> configs;
     // This is a map of secretName(aka how the secret is going to be

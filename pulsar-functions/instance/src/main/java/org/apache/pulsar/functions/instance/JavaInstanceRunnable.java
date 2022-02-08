@@ -135,7 +135,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
     // a read write lock for stats operations
     private ReadWriteLock statsLock = new ReentrantReadWriteLock();
 
-    private final List<Transformation> transformations = new ArrayList<>();
+    private final List<Transformation> transformations = new LinkedList<>();
 
     public JavaInstanceRunnable(InstanceConfig instanceConfig,
                                 PulsarClient pulsarClient,
@@ -233,6 +233,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
     }
 
     ContextImpl setupContext() {
+        log.warn("instanceConfig.functionDetails={}", instanceConfig.getFunctionDetails());
         Logger instanceLog = LoggerFactory.getILoggerFactory().getLogger(
                 "function-" + instanceConfig.getFunctionDetails().getName());
         return new ContextImpl(instanceConfig, instanceLog, client, secretsProvider,
@@ -359,7 +360,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
         }
         try {
             Record record = srcRecord;
-            for(Transformation transformation : this.sink.transformations()) {
+            for(Transformation transformation : transformations) {
                 if (transformation.test(record))
                     record = transformation.apply(record);
             }
@@ -381,7 +382,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
         }
         try {
             record = this.source.read();
-            for(Transformation transformation : this.source.transformations()) {
+            for(Transformation transformation : transformations) {
                 if (transformation.test(record))
                     record = transformation.apply(record);
             }
@@ -625,10 +626,20 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
     }
 
     private void setupTransformations(ContextImpl contextImpl) throws Exception {
+        log.warn("setupTransformations contextImpl={}", contextImpl);
         for(TransformationConfig transformationConfig : contextImpl.getTransformationConfigs()) {
-            Transformation transformation = (Transformation) Class.forName(transformationConfig.getClassName()).getDeclaredConstructor().newInstance();
-            transformation.init(transformationConfig.getConfig());
-            transformations.add(transformation);
+            log.warn("Creating transformation className={} config={}", transformationConfig.getClassName(), transformationConfig.getConfig());
+            if (transformationConfig.getClassName() != null) {
+                try {
+                    Transformation transformation = (Transformation) Class.forName(transformationConfig.getClassName()).getDeclaredConstructor().newInstance();
+                    transformation.init(transformationConfig.getConfig());
+                    transformations.add(transformation);
+                } catch(Exception e) {
+                    log.error("Cannot create transformation className={} config={}",
+                            transformationConfig.getClassName(), transformationConfig.getConfig(), e);
+                    throw e;
+                }
+            }
         }
     }
 

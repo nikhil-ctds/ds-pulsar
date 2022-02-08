@@ -102,8 +102,6 @@ class ContextImpl implements Context, SinkContext, SourceContext, AutoCloseable 
 
     private Map<String, Object> userConfigs;
 
-    private List<TransformationConfig> transformationConfigs;
-
     private ComponentStatsManager statsManager;
 
     Map<String, String[]> userMetricsLabels = new HashMap<>();
@@ -118,6 +116,8 @@ class ContextImpl implements Context, SinkContext, SourceContext, AutoCloseable 
 
     private List<Consumer<?>> inputConsumers;
     private final Map<TopicName, Consumer> topicConsumers = new ConcurrentHashMap<>();
+
+    private final List<TransformationConfig> transformationConfigs;
 
     static {
         // add label to indicate user metric
@@ -171,13 +171,20 @@ class ContextImpl implements Context, SinkContext, SourceContext, AutoCloseable 
                     new TypeToken<Map<String, Object>>() {
                     }.getType());
         }
-        if (config.getFunctionDetails().getTransformationConfigs().isEmpty()) {
-            transformationConfigs = new ArrayList<>(0);
-        } else {
-            transformationConfigs = new Gson().fromJson(config.getFunctionDetails().getTransformationConfigs(),
+
+        if (!config.getFunctionDetails().getSink().getTransformationConfigs().isEmpty()) {
+            transformationConfigs = new Gson().fromJson(config.getFunctionDetails().getSink().getTransformationConfigs(),
                     new TypeToken<List<TransformationConfig>>() {
                     }.getType());
+        } else if (!config.getFunctionDetails().getSource().getTransformationConfigs().isEmpty()) {
+            transformationConfigs = new Gson().fromJson(config.getFunctionDetails().getSource().getTransformationConfigs(),
+                    new TypeToken<List<TransformationConfig>>()
+                    {
+                    }.getType());
+        } else {
+            transformationConfigs = new ArrayList<>(0);
         }
+
         this.secretsProvider = secretsProvider;
         if (!StringUtils.isEmpty(config.getFunctionDetails().getSecretsMap())) {
             secretsMap = new Gson().fromJson(config.getFunctionDetails().getSecretsMap(),

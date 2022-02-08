@@ -34,6 +34,7 @@ import org.apache.pulsar.common.functions.FunctionConfig;
 import org.apache.pulsar.common.functions.Resources;
 import org.apache.pulsar.common.io.ConnectorDefinition;
 import org.apache.pulsar.common.io.SinkConfig;
+import org.apache.pulsar.common.io.TransformationConfig;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.nar.NarClassLoader;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
@@ -220,8 +221,8 @@ public class SinkConfigUtils {
         if (sinkConfig.getConfigs() != null) {
             sinkSpecBuilder.setConfigs(new Gson().toJson(sinkConfig.getConfigs()));
         }
-        if (sinkConfig.getTransformations() != null && !sinkConfig.getTransformations().isEmpty()) {
-            sinkSpecBuilder.setTransformationConfigs(new Gson().toJson(sinkConfig.getTransformations()));
+        if (sinkConfig.getTransformationConfigs() != null && !sinkConfig.getTransformationConfigs().isEmpty()) {
+            sinkSpecBuilder.setTransformationConfigs(new Gson().toJson(sinkConfig.getTransformationConfigs()));
         }
         if (sinkConfig.getSecrets() != null && !sinkConfig.getSecrets().isEmpty()) {
             functionDetailsBuilder.setSecretsMap(new Gson().toJson(sinkConfig.getSecrets()));
@@ -327,6 +328,18 @@ public class SinkConfigUtils {
                 throw new RuntimeException(e);
             }
             sinkConfig.setConfigs(configMap);
+        }
+        if (!org.apache.commons.lang3.StringUtils.isEmpty(functionDetails.getSink().getTransformationConfigs())) {
+            TypeReference<List<TransformationConfig>> typeRef
+                    = new TypeReference<List<TransformationConfig>>() {};
+            List<TransformationConfig> transformationConfigs;
+            try {
+                transformationConfigs = ObjectMapperFactory.getThreadLocal().readValue(functionDetails.getSink().getTransformationConfigs(), typeRef);
+            } catch (IOException e) {
+                log.error("Failed to read transformationConfigs for sink {}", FunctionCommon.getFullyQualifiedName(functionDetails), e);
+                throw new RuntimeException(e);
+            }
+            sinkConfig.setTransformationConfigs(transformationConfigs);
         }
         if (!isEmpty(functionDetails.getSecretsMap())) {
             Type type = new TypeToken<Map<String, Object>>() {}.getType();
@@ -559,7 +572,7 @@ public class SinkConfigUtils {
             mergedConfig.setConfigs(newConfig.getConfigs());
         }
         if (newConfig.getConfigs() != null) {
-            mergedConfig.setTransformations(newConfig.getTransformations());
+            mergedConfig.setTransformationConfigs(newConfig.getTransformationConfigs());
         }
         if (newConfig.getSecrets() != null) {
             mergedConfig.setSecrets(newConfig.getSecrets());

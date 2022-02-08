@@ -62,6 +62,7 @@ import org.apache.pulsar.common.io.ConnectorDefinition;
 import org.apache.pulsar.common.functions.FunctionConfig;
 import org.apache.pulsar.common.io.SourceConfig;
 import org.apache.pulsar.common.functions.Utils;
+import org.apache.pulsar.common.io.TransformationConfig;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 
 @Getter
@@ -321,6 +322,8 @@ public class CmdSources extends CmdBase {
         protected String DEPRECATED_sourceConfigString;
         @Parameter(names = "--source-config", description = "Source config key/values")
         protected String sourceConfigString;
+        @Parameter(names = {"--transformations"}, description = "Simple message transformations configuration", listConverter = StringConverter.class)
+        protected String sourceTransformationsString;
         @Parameter(names = "--batch-source-config", description = "Batch source config key/values")
         protected String batchSourceConfigString;
         @Parameter(names = "--custom-runtime-options", description = "A string that encodes options to customize the runtime, see docs for configured runtime for details")
@@ -429,6 +432,14 @@ public class CmdSources extends CmdBase {
             } catch (Exception ex) {
                 throw new ParameterException("Cannot parse source-config", ex);
             }
+
+            try {
+                if (null != sourceTransformationsString) {
+                    sourceConfig.setTransformationConfigs(parseTransformationConfigs(sourceTransformationsString));
+                }
+            } catch (Exception ex) {
+                throw new ParameterException("Cannot parse source-config", ex);
+            }
             
             if (null != batchSourceConfigString) {
             	sourceConfig.setBatchSourceConfig(parseBatchSourceConfigs(batchSourceConfigString));
@@ -449,7 +460,15 @@ public class CmdSources extends CmdBase {
             return mapper.readValue(str, typeRef);
         }
 
-            protected BatchSourceConfig parseBatchSourceConfigs(String str) {
+        protected List<TransformationConfig> parseTransformationConfigs(String str) throws JsonProcessingException {
+            ObjectMapper mapper = ObjectMapperFactory.getThreadLocal();
+            TypeReference<List<TransformationConfig>> typeRef
+                    = new TypeReference<List<TransformationConfig>>() {};
+
+            return mapper.readValue(str, typeRef);
+        }
+
+        protected BatchSourceConfig parseBatchSourceConfigs(String str) {
         	return new Gson().fromJson(str, BatchSourceConfig.class);
         }
 

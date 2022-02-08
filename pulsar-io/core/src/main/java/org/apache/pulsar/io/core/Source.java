@@ -25,7 +25,7 @@ import org.apache.pulsar.functions.api.Record;
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface Source<T> extends Connector<T>, AutoCloseable {
+public interface Source<T> extends AutoCloseable {
 
     /**
      * Open connector with configuration.

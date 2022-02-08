@@ -36,7 +36,6 @@ import org.apache.pulsar.config.validation.ConfigValidationAnnotations;
 import org.apache.pulsar.functions.api.utils.IdentityFunction;
 import org.apache.pulsar.functions.proto.Function;
 import org.apache.pulsar.functions.utils.io.ConnectorUtils;
-import org.apache.pulsar.io.core.transform.RenameFields;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
@@ -220,18 +219,18 @@ public class SinkConfigUtilsTest extends PowerMockTestCase {
     }
 
     @Test
-    public void testMergeDifferentTransformationConfig() {
+    public void testMergeDifferentTransformationConfigs() {
         SinkConfig sinkConfig = createSinkConfig();
-        List<String> myTransformations = new LinkedList<>();
+        List<String> transformationConfigs = new LinkedList<>();
         TransformationConfig transformationConfig = new TransformationConfig("myclassname", ImmutableMap.of("MyKey", "MyValue"));
-        myTransformations.add(new Gson().toJson(transformationConfig));
-        SinkConfig newSinkConfig = createUpdatedSinkConfig("transformations", myTransformations);
+        transformationConfigs.add(new Gson().toJson(transformationConfig));
+        SinkConfig newSinkConfig = createUpdatedSinkConfig("transformationConfigs", transformationConfigs);
         SinkConfig mergedConfig = SinkConfigUtils.validateUpdate(sinkConfig, newSinkConfig);
         assertEquals(
-                mergedConfig.getTransformations(),
-                myTransformations
+                mergedConfig.getTransformationConfigs(),
+                transformationConfigs
         );
-        mergedConfig.setTransformations(sinkConfig.getTransformations());
+        mergedConfig.setTransformationConfigs(sinkConfig.getTransformationConfigs());
         assertEquals(
                 new Gson().toJson(sinkConfig),
                 new Gson().toJson(mergedConfig)
@@ -378,7 +377,7 @@ public class SinkConfigUtilsTest extends PowerMockTestCase {
         sinkConfig.setProcessingGuarantees(FunctionConfig.ProcessingGuarantees.ATLEAST_ONCE);
         sinkConfig.setRetainOrdering(false);
         sinkConfig.setConfigs(new HashMap<>());
-        sinkConfig.setTransformations(new LinkedList<>());
+        sinkConfig.setTransformationConfigs(new LinkedList<>());
         sinkConfig.setAutoAck(true);
         sinkConfig.setTimeoutMs(2000l);
         sinkConfig.setArchive("DummyArchive.nar");

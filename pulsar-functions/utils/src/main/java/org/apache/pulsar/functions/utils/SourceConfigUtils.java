@@ -123,8 +123,9 @@ public class SourceConfigUtils {
 
         sourceSpecBuilder.setConfigs(new Gson().toJson(configs));
 
-        if (sourceConfig.getTransformations() != null && !sourceConfig.getTransformations().isEmpty())
-            sourceSpecBuilder.setTransformationConfigs((new Gson().toJson(sourceConfig.getTransformations())));
+        if (sourceConfig.getTransformationConfigs() != null && !sourceConfig.getTransformationConfigs().isEmpty()) {
+            sourceSpecBuilder.setTransformationConfigs((new Gson().toJson(sourceConfig.getTransformationConfigs())));
+        }
 
         if (sourceConfig.getSecrets() != null && !sourceConfig.getSecrets().isEmpty()) {
             functionDetailsBuilder.setSecretsMap(new Gson().toJson(sourceConfig.getSecrets()));
@@ -236,6 +237,10 @@ public class SourceConfigUtils {
             configMap.remove(BatchSourceConfig.BATCHSOURCE_CONFIG_KEY);
             configMap.remove(BatchSourceConfig.BATCHSOURCE_CLASSNAME_KEY);
             sourceConfig.setConfigs(configMap);
+        }
+        List<TransformationConfig> transformationConfigs = extractSourceTransformationConfigs(sourceSpec, FunctionCommon.getFullyQualifiedName(functionDetails));
+        if (transformationConfigs != null && !transformationConfigs.isEmpty()) {
+            sourceConfig.setTransformationConfigs(transformationConfigs);
         }
         if (!isEmpty(functionDetails.getSecretsMap())) {
             Type type = new TypeToken<Map<String, Object>>() {}.getType();
@@ -412,8 +417,8 @@ public class SourceConfigUtils {
         if (newConfig.getConfigs() != null) {
             mergedConfig.setConfigs(newConfig.getConfigs());
         }
-        if (newConfig.getTransformations() != null) {
-            mergedConfig.setTransformations(newConfig.getTransformations());
+        if (newConfig.getTransformationConfigs() != null) {
+            mergedConfig.setTransformationConfigs(newConfig.getTransformationConfigs());
         }
         if (newConfig.getSecrets() != null) {
             mergedConfig.setSecrets(newConfig.getSecrets());
@@ -462,6 +467,22 @@ public class SourceConfigUtils {
                 return ObjectMapperFactory.getThreadLocal().readValue(sourceSpec.getConfigs(), typeRef);
             } catch (IOException e) {
                 log.error("Failed to read configs for source {}", fqfn, e);
+                throw new RuntimeException(e);
+            }
+        } else {
+            return null;
+        }
+    }
+
+    public static List<TransformationConfig> extractSourceTransformationConfigs(Function.SourceSpec sourceSpec, String fqfn) {
+        if (!StringUtils.isEmpty(sourceSpec.getTransformationConfigs())) {
+            TypeReference<List<TransformationConfig>> typeRef
+                    = new TypeReference<List<TransformationConfig>>() {
+            };
+            try {
+                return ObjectMapperFactory.getThreadLocal().readValue(sourceSpec.getConfigs(), typeRef);
+            } catch (IOException e) {
+                log.error("Failed to read transformationConfigs for source {}", fqfn, e);
                 throw new RuntimeException(e);
             }
         } else {

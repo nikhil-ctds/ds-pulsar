@@ -207,6 +207,7 @@ public class RenameFields implements Transformation<Object> {
     public Record apply(Record<Object> record) {
         //  update the local schema if obsolete
         Object object = record.getValue();
+        LOG.warn("transforming class={} record={} ", object.getClass().getName(), object);
         if (object  instanceof GenericData.Record) {
             GenericData.Record input = (GenericData.Record) object;
             org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(input.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
@@ -221,11 +222,6 @@ public class RenameFields implements Transformation<Object> {
             return new MyRecord(record, new AvroSchemaWrapper(avroSchema), record.getKey(), outGenericRecord);
         }
         return record;
-    }
-
-    @Override
-    public void close() {
-
     }
 
     @Override

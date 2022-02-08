@@ -204,18 +204,18 @@ public class SourceConfigUtilsTest extends PowerMockTestCase {
     }
 
     @Test
-    public void testMergeDifferentTransformationConfig() {
+    public void testMergeDifferentTransformationConfigs() {
         SourceConfig sourceConfig = createSourceConfig();
         List<String> myTransformations = new LinkedList<>();
         TransformationConfig transformationConfig = new TransformationConfig("myclassname", ImmutableMap.of("MyKey", "MyValue"));
         myTransformations.add(new Gson().toJson(transformationConfig));
-        SourceConfig newSourceConfig = createUpdatedSourceConfig("transformations", myTransformations);
+        SourceConfig newSourceConfig = createUpdatedSourceConfig("transformationConfigs", myTransformations);
         SourceConfig mergedConfig = SourceConfigUtils.validateUpdate(sourceConfig, newSourceConfig);
         assertEquals(
-                mergedConfig.getTransformations(),
+                mergedConfig.getTransformationConfigs(),
                 myTransformations
         );
-        mergedConfig.setTransformations(sourceConfig.getTransformations());
+        mergedConfig.setTransformationConfigs(sourceConfig.getTransformationConfigs());
         assertEquals(
                 new Gson().toJson(sourceConfig),
                 new Gson().toJson(mergedConfig)

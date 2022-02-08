@@ -28,7 +28,7 @@ import org.apache.pulsar.functions.api.Record;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface Sink<T> extends Connector<T>, AutoCloseable {
+public interface Sink<T> extends AutoCloseable {
     /**
      * Open connector with configuration.
      *

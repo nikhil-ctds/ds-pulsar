@@ -28,7 +28,7 @@ import java.util.function.Predicate;
  * Applies the transformation if the predicate is true.
  * @param <T>
  */
-public interface Transformation<T> extends Predicate<Record<T>>, Closeable {
+public interface Transformation<T> extends Predicate<Record<T>> {
 
     /**
      * Initialize the transformation with its configuration

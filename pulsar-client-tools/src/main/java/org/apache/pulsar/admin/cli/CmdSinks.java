@@ -58,6 +58,7 @@ import org.apache.pulsar.common.functions.UpdateOptionsImpl;
 import org.apache.pulsar.common.io.ConnectorDefinition;
 import org.apache.pulsar.common.io.SinkConfig;
 import org.apache.pulsar.common.functions.Utils;
+import org.apache.pulsar.common.io.TransformationConfig;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 
 @Getter
@@ -324,6 +325,7 @@ public class CmdSinks extends CmdBase {
         @Parameter(names = "--sink-config-file", description = "The path to a YAML config file specifying the "
                 + "sink's configuration")
         protected String sinkConfigFile;
+
         @Parameter(names = "--cpu", description = "The CPU (in cores) that needs to be allocated per sink instance (applicable only to Docker runtime)")
         protected Double cpu;
         @Parameter(names = "--ram", description = "The RAM (in bytes) that need to be allocated per sink instance (applicable only to the process and Docker runtimes)")
@@ -334,6 +336,9 @@ public class CmdSinks extends CmdBase {
         protected String DEPRECATED_sinkConfigString;
         @Parameter(names = "--sink-config", description = "User defined configs key/values")
         protected String sinkConfigString;
+        @Parameter(names = {"--transformations"}, description = "Simple message transformations configuration", listConverter = StringConverter.class)
+        protected String sinkTransformationsString;
+
         @Parameter(names = "--auto-ack", description = "Whether or not the framework will automatically acknowledge messages", arity = 1)
         protected Boolean autoAck;
         @Parameter(names = "--timeout-ms", description = "The message timeout in milliseconds")
@@ -481,6 +486,14 @@ public class CmdSinks extends CmdBase {
                 throw new ParameterException("Cannot parse sink-config", ex);
             }
 
+            try {
+                if (null != sinkTransformationsString) {
+                    sinkConfig.setTransformationConfigs(parseTransformations(sinkTransformationsString));
+                }
+            } catch (Exception ex) {
+                throw new ParameterException("Cannot parse sink-config", ex);
+            }
+
             if (autoAck != null) {
                 sinkConfig.setAutoAck(autoAck);
             }
@@ -503,6 +516,14 @@ public class CmdSinks extends CmdBase {
             ObjectMapper mapper = ObjectMapperFactory.getThreadLocal();
             TypeReference<HashMap<String,Object>> typeRef
                 = new TypeReference<HashMap<String,Object>>() {};
+
+            return mapper.readValue(str, typeRef);
+        }
+
+        protected List<TransformationConfig> parseTransformations(String str) throws JsonProcessingException {
+            ObjectMapper mapper = ObjectMapperFactory.getThreadLocal();
+            TypeReference<List<TransformationConfig>> typeRef
+                    = new TypeReference<List<TransformationConfig>>() {};
 
             return mapper.readValue(str, typeRef);
         }
