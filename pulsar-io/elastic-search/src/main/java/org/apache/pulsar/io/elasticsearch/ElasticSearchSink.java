@@ -291,9 +291,9 @@ public class ElasticSearchSink implements Sink<GenericObject> {
             return null;
         switch (schema.getSchemaInfo().getType()) {
             case JSON:
-                return (JsonNode) ((GenericRecord) val).getNativeObject();
+                return (JsonNode) ((GenericObject) val).getNativeObject();
             case AVRO:
-                org.apache.avro.generic.GenericRecord node = (org.apache.avro.generic.GenericRecord) ((GenericRecord) val).getNativeObject();
+                org.apache.avro.generic.GenericRecord node = (org.apache.avro.generic.GenericRecord) ((GenericObject) val).getNativeObject();
                 return JsonConverter.toJson(node);
             default:
                 throw new UnsupportedOperationException("Unsupported value schemaType=" + schema.getSchemaInfo().getType());
