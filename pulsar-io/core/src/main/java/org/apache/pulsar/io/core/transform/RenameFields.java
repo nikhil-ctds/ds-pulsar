@@ -245,26 +245,30 @@ public class RenameFields implements Transformation<GenericObject> {
         Object object = record.getValue();
         Schema schema = record.getSchema();
 
-        LOG.warn("transforming class={} record={} schemaType={} schemaClass={}", object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
+        LOG.warn("transforming class={} record={} schemaType={} schemaClass={}",
+                object == null ? null : object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
         if (schema.getNativeSchema().isPresent()) {
             schema = (Schema) schema.getNativeSchema().get();
         }
-        if (object instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
+        if (object != null && object instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
             object = ((org.apache.pulsar.client.api.schema.GenericRecord)object).getNativeObject();
         }
-        LOG.warn("transforming2 class={} record={} schemaType={} schemaClass={}", object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
+        LOG.warn("transforming2 class={} record={} schemaType={} schemaClass={}",
+                object == null ? null : object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
 
         if (record.getSchema().getSchemaInfo().getType().equals(SchemaType.KEY_VALUE)) {
-            Object value = ((KeyValue)object).getValue();
-            Object key = ((KeyValue)object).getKey();
+            Object value = object == null ? null : ((KeyValue)object).getValue();
+            Object key = object == null ? record.getKey().get() : ((KeyValue)object).getKey();
 
             if (key instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
                 key = ((org.apache.pulsar.client.api.schema.GenericRecord)key).getNativeObject();
             }
-            if (value instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
+            if (value != null && value instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
                 value = ((org.apache.pulsar.client.api.schema.GenericRecord)value).getNativeObject();
             }
-            LOG.warn("transforming3 valueClass={} value={} keyClass={} key={}", value.getClass().getName(), value, key.getClass().getName(), key);
+            LOG.warn("transforming3 valueClass={} value={} keyClass={} key={}",
+                    value == null ? null : value.getClass().getName(), value,
+                    key == null ? null : key.getClass().getName(), key);
             if (value  instanceof GenericData.Record) {
                 GenericData.Record inKey = (GenericData.Record) key;
                 GenericData.Record inValue = (GenericData.Record) value;
