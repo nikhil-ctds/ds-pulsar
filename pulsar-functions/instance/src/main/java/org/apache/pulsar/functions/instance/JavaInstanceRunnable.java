@@ -23,10 +23,13 @@ import static org.apache.pulsar.functions.utils.FunctionCommon.convertFromFuncti
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 
-import com.google.gson.Gson;
 import com.scurrilous.circe.checksum.Crc32cIntChecksum;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.List;
+import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -273,6 +276,12 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
                 // start time for process latency stat
                 stats.processTimeStart();
 
+                // apply record transformations
+                for(Transformation transformation : transformations) {
+                    if (transformation.test(currentRecord))
+                        currentRecord = transformation.apply(currentRecord);
+                }
+
                 // process the message
                 Thread.currentThread().setContextClassLoader(functionClassLoader);
                 result = javaInstance.handleMessage(
@@ -359,12 +368,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
             Thread.currentThread().setContextClassLoader(functionClassLoader);
         }
         try {
-            Record record = srcRecord;
-            for(Transformation transformation : transformations) {
-                if (transformation.test(record))
-                    record = transformation.apply(record);
-            }
-            this.sink.write(new SinkRecord<>(record, output));
+            this.sink.write(new SinkRecord<>(srcRecord, output));
         } catch (Exception e) {
             log.info("Encountered exception in sink write: ", e);
             stats.incrSinkExceptions(e);
@@ -382,10 +386,6 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
         }
         try {
             record = this.source.read();
-            for(Transformation transformation : transformations) {
-                if (transformation.test(record))
-                    record = transformation.apply(record);
-            }
         } catch (Exception e) {
             if (stats != null) {
                 stats.incrSourceExceptions(e);

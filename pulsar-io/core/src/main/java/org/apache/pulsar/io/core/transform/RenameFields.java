@@ -6,6 +6,11 @@ import lombok.NoArgsConstructor;
 import org.apache.avro.generic.GenericData;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.schema.GenericObject;
+import org.apache.pulsar.common.schema.KeyValue;
+import org.apache.pulsar.common.schema.KeyValueEncodingType;
+import org.apache.pulsar.common.schema.SchemaType;
+import org.apache.pulsar.functions.api.KVRecord;
 import org.apache.pulsar.functions.api.Record;
 import org.apache.pulsar.io.core.Transformation;
 import org.slf4j.Logger;
@@ -14,7 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class RenameFields implements Transformation<Object> {
+public class RenameFields implements Transformation<GenericObject> {
     private static final Logger LOG = LoggerFactory.getLogger(RenameFields.class);
 
     List<String> sources = new ArrayList<>();
@@ -30,18 +35,21 @@ public class RenameFields implements Transformation<Object> {
     }
 
     // record wrapper with the replaced schema and value
-    private class MyRecord implements Record
+    private class MyKVGenericRecord implements KVRecord
     {
         private final Record record;
-        private final Schema schema;
-        private final Optional<String> key;
-        private final Object value;
+        private final Schema keySchema;
+        private final Schema valueSchema;
+        private final GenericObject genericKeyValue;
 
-        public MyRecord(Record record, Schema schema, Optional<String> key, Object value) {
+        public MyKVGenericRecord(Record record,
+                                 Schema keySchema,
+                                 Schema valueSchema,
+                                 GenericObject keyValue) {
             this.record = record;
-            this.schema = schema;
-            this.key = key;
-            this.value = value;
+            this.keySchema = keySchema;
+            this.valueSchema = valueSchema;
+            this.genericKeyValue = keyValue;
         }
 
         @Override
@@ -51,16 +59,20 @@ public class RenameFields implements Transformation<Object> {
 
         @Override
         public Optional<String> getKey() {
-            return key;
+            KeyValue<GenericObject, GenericObject> keyValue = (KeyValue<GenericObject, GenericObject>) genericKeyValue.getNativeObject();
+            return keyValue.getKey() == null
+            ? Optional.empty()
+            : Optional.of(Base64.getEncoder().encodeToString(keySchema.encode(keyValue.getKey())));
         }
 
+        @Override
         public Schema getSchema() {
-            return schema;
+            return Schema.KeyValue(keySchema, valueSchema, KeyValueEncodingType.SEPARATED);
         }
 
         @Override
         public Object getValue() {
-            return value;
+            return genericKeyValue;
         }
 
         /**
@@ -89,6 +101,30 @@ public class RenameFields implements Transformation<Object> {
         public Optional<Message> getMessage() {
             return record.getMessage();
         }
+
+        @Override
+        public Schema getKeySchema()
+        {
+            return keySchema;
+        }
+
+        @Override
+        public Schema getValueSchema()
+        {
+            return valueSchema;
+        }
+
+        @Override
+        public KeyValueEncodingType getKeyValueEncodingType()
+        {
+            return KeyValueEncodingType.SEPARATED;
+        }
+
+        @Override
+        public String toString() {
+            KeyValue<GenericObject, GenericObject> keyValue = (KeyValue<GenericObject, GenericObject>) genericKeyValue.getNativeObject();
+            return keyValue.toString();
+        }
     }
 
     /**
@@ -108,7 +144,7 @@ public class RenameFields implements Transformation<Object> {
                 }
             }
         }
-        LOG.debug("rename sources={} targets={}", sources, targets);
+        LOG.warn("rename sources={} targets={}", sources, targets);
     }
 
     /**
@@ -204,28 +240,94 @@ public class RenameFields implements Transformation<Object> {
     }
 
     @Override
-    public Record apply(Record<Object> record) {
+    public Record<GenericObject> apply(Record<GenericObject> record) {
         //  update the local schema if obsolete
         Object object = record.getValue();
-        LOG.warn("transforming class={} record={} ", object.getClass().getName(), object);
-        if (object  instanceof GenericData.Record) {
-            GenericData.Record input = (GenericData.Record) object;
-            org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(input.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
-            TreeMap props = new TreeMap<>();
-            falltenRecord(props, "", input);
-            for(int i = 0; i < sources.size(); i++) {
-                Object value = props.remove(sources.get(i));
-                if (value != null)
-                    props.put(targets.get(i), value);
-            }
-            org.apache.avro.generic.GenericRecord outGenericRecord = rebuidRecord(avroSchema, new LinkedList<>(props.entrySet()), "");
-            return new MyRecord(record, new AvroSchemaWrapper(avroSchema), record.getKey(), outGenericRecord);
+        Schema schema = record.getSchema();
+
+        LOG.warn("transforming class={} record={} schemaType={} schemaClass={}", object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
+        if (schema.getNativeSchema().isPresent()) {
+            schema = (Schema) schema.getNativeSchema().get();
         }
+        if (object instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
+            object = ((org.apache.pulsar.client.api.schema.GenericRecord)object).getNativeObject();
+        }
+        LOG.warn("transforming2 class={} record={} schemaType={} schemaClass={}", object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
+
+        if (record.getSchema().getSchemaInfo().getType().equals(SchemaType.KEY_VALUE)) {
+            Object value = ((KeyValue)object).getValue();
+            Object key = ((KeyValue)object).getKey();
+
+            if (key instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
+                key = ((org.apache.pulsar.client.api.schema.GenericRecord)key).getNativeObject();
+            }
+            if (value instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
+                value = ((org.apache.pulsar.client.api.schema.GenericRecord)value).getNativeObject();
+            }
+            LOG.warn("transforming3 valueClass={} value={} keyClass={} key={}", value.getClass().getName(), value, key.getClass().getName(), key);
+            if (value  instanceof GenericData.Record) {
+                GenericData.Record inKey = (GenericData.Record) key;
+                GenericData.Record inValue = (GenericData.Record) value;
+                org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(inValue.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
+                TreeMap props = new TreeMap<>();
+                falltenRecord(props, "", inValue);
+                for(int i = 0; i < sources.size(); i++) {
+                    Object v = props.remove(sources.get(i));
+                    if (v != null)
+                        props.put(targets.get(i), v);
+                }
+                final org.apache.avro.generic.GenericRecord outGenericRecord = rebuidRecord(avroSchema, new LinkedList<>(props.entrySet()), "");
+                final Object outKey = key;
+                MyKVGenericRecord transformedRecord = new MyKVGenericRecord(record,
+                        new AvroSchemaWrapper(inKey.getSchema()),
+                        new AvroSchemaWrapper(avroSchema),
+                        new GenericObject() {
+                            @Override
+                            public SchemaType getSchemaType() {
+                                return SchemaType.KEY_VALUE;
+                            }
+
+                            @Override
+                            public Object getNativeObject() {
+                                return new KeyValue(new GenericObject()
+                                {
+                                    @Override
+                                    public SchemaType getSchemaType()
+                                    {
+                                        return SchemaType.AVRO;
+                                    }
+
+                                    @Override
+                                    public Object getNativeObject()
+                                    {
+                                        return outKey;
+                                    }
+                                }, new GenericObject()
+                                {
+                                    @Override
+                                    public SchemaType getSchemaType()
+                                    {
+                                        return SchemaType.AVRO;
+                                    }
+
+                                    @Override
+                                    public Object getNativeObject()
+                                    {
+                                        return outGenericRecord;
+                                    }
+                                });
+                            }
+                        });
+                LOG.warn("transformedRecord={} class={}", transformedRecord, transformedRecord.getClass().getName());
+                return transformedRecord;
+            }
+        }
+        LOG.warn("Unchanged record={}  class={}", record, record.getClass().getName());
         return record;
     }
 
     @Override
-    public boolean test(Record<Object> objectRecord) {
+    public boolean test(Record<GenericObject> objectRecord) {
         return true;
     }
 }

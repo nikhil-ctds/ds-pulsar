@@ -1,14 +1,22 @@
 package org.apache.pulsar.io.core.transform;
 
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.*;
+import org.apache.avro.specific.SpecificDatumReader;
+import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.pulsar.client.api.schema.GenericObject;
 import org.apache.pulsar.client.api.schema.SchemaInfoProvider;
 import org.apache.pulsar.common.schema.SchemaInfo;
 import org.apache.pulsar.common.schema.SchemaType;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Optional;
 
-public class AvroSchemaWrapper implements org.apache.pulsar.client.api.Schema<byte[]> {
+public class AvroSchemaWrapper implements org.apache.pulsar.client.api.Schema<GenericObject> {
 
     private final SchemaInfo schemaInfo;
     private final org.apache.avro.Schema nativeAvroSchema;
@@ -24,8 +32,30 @@ public class AvroSchemaWrapper implements org.apache.pulsar.client.api.Schema<by
     }
 
     @Override
-    public byte[] encode(byte[] bytes) {
-        return bytes;
+    public byte[] encode(GenericObject genericObject) {
+        return serialize((GenericRecord) genericObject.getNativeObject(), this.nativeAvroSchema);
+    }
+
+    public static byte[] serialize(GenericRecord record, org.apache.avro.Schema schema)
+    {
+        try
+        {
+            SpecificDatumWriter<GenericRecord> datumWriter = new SpecificDatumWriter<>(schema);
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            BinaryEncoder binaryEncoder = new EncoderFactory().binaryEncoder(byteArrayOutputStream, null);
+            datumWriter.write(record, binaryEncoder);
+            binaryEncoder.flush();
+            return byteArrayOutputStream.toByteArray();
+        } catch(IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static GenericRecord  deserialize(byte[] recordBytes, org.apache.avro.Schema schema) throws IOException {
+        DatumReader<GenericRecord> datumReader = new SpecificDatumReader(schema);
+        ByteArrayInputStream stream = new ByteArrayInputStream(recordBytes);
+        BinaryDecoder binaryDecoder = new DecoderFactory().binaryDecoder(stream, null);
+        return datumReader.read(null, binaryDecoder);
     }
 
     @Override
@@ -54,12 +84,12 @@ public class AvroSchemaWrapper implements org.apache.pulsar.client.api.Schema<by
     }
 
     @Override
-    public byte[] decode(byte[] bytes) {
+    public GenericObject decode(byte[] bytes) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public byte[] decode(byte[] bytes, byte[] schemaVersion) {
+    public GenericObject decode(byte[] bytes, byte[] schemaVersion) {
         throw new UnsupportedOperationException();
     }
 
