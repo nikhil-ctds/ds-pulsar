@@ -276,10 +276,13 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
                 // start time for process latency stat
                 stats.processTimeStart();
 
-                // apply record transformations
-                for(Transformation transformation : transformations) {
-                    if (transformation.test(currentRecord))
-                        currentRecord = transformation.apply(currentRecord);
+                // apply record transformations for sink connectors
+                if (componentType == org.apache.pulsar.functions.proto.Function.FunctionDetails.ComponentType.SINK) {
+                    log.warn("main loop transforming componentType={} records with schema={}", componentType, currentRecord.getSchema());
+                    for (Transformation transformation : transformations) {
+                        if (transformation.test(currentRecord))
+                            currentRecord = transformation.apply(currentRecord);
+                    }
                 }
 
                 // process the message
@@ -368,7 +371,16 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
             Thread.currentThread().setContextClassLoader(functionClassLoader);
         }
         try {
-            this.sink.write(new SinkRecord<>(srcRecord, output));
+            Record record = srcRecord;
+            if (componentType == org.apache.pulsar.functions.proto.Function.FunctionDetails.ComponentType.SOURCE) {
+                // apply record transformations for source connectors
+                log.warn("sendOutputMessage transforming componentType={} records with schema={}", componentType, record.getSchema());
+                for (Transformation transformation : transformations) {
+                    if (transformation.test(record))
+                        record = transformation.apply(record);
+                }
+            }
+            this.sink.write(new SinkRecord<>(record, output));
         } catch (Exception e) {
             log.info("Encountered exception in sink write: ", e);
             stats.incrSinkExceptions(e);

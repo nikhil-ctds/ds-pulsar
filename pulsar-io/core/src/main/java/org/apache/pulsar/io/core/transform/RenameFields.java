@@ -59,10 +59,11 @@ public class RenameFields implements Transformation<GenericObject> {
 
         @Override
         public Optional<String> getKey() {
-            KeyValue<GenericObject, GenericObject> keyValue = (KeyValue<GenericObject, GenericObject>) genericKeyValue.getNativeObject();
+            KeyValue keyValue = (KeyValue) genericKeyValue.getNativeObject();
             return keyValue.getKey() == null
             ? Optional.empty()
-            : Optional.of(Base64.getEncoder().encodeToString(keySchema.encode(keyValue.getKey())));
+            : Optional.of(Base64.getEncoder().encodeToString(
+                    Schema.BYTES.equals(keySchema.getSchemaInfo().getType()) ? (byte[]) keyValue.getKey() : keySchema.encode(keyValue.getKey())));
         }
 
         @Override
@@ -122,7 +123,7 @@ public class RenameFields implements Transformation<GenericObject> {
 
         @Override
         public String toString() {
-            KeyValue<GenericObject, GenericObject> keyValue = (KeyValue<GenericObject, GenericObject>) genericKeyValue.getNativeObject();
+            KeyValue keyValue = (KeyValue) genericKeyValue.getNativeObject();
             return keyValue.toString();
         }
     }
@@ -246,31 +247,32 @@ public class RenameFields implements Transformation<GenericObject> {
         Schema schema = record.getSchema();
 
         LOG.warn("transforming class={} record={} schemaType={} schemaClass={}",
-                object == null ? null : object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
-        if (schema.getNativeSchema().isPresent()) {
+                object == null ? null : object.getClass().getName(), object,
+                schema == null ? null : schema.getSchemaInfo().getType(), schema == null ? null : schema.getClass().getName());
+        if (schema != null && schema.getNativeSchema().isPresent()) {
             schema = (Schema) schema.getNativeSchema().get();
         }
-        if (object != null && object instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
-            object = ((org.apache.pulsar.client.api.schema.GenericRecord)object).getNativeObject();
+        if (object != null && object instanceof org.apache.pulsar.client.api.schema.GenericObject) {
+            object = ((org.apache.pulsar.client.api.schema.GenericObject)object).getNativeObject();
         }
         LOG.warn("transforming2 class={} record={} schemaType={} schemaClass={}",
-                object == null ? null : object.getClass().getName(), object, schema.getSchemaInfo().getType(), schema.getClass().getName());
+                object == null ? null : object.getClass().getName(), object,
+                schema == null ? null : schema.getSchemaInfo().getType(), schema == null ? null : schema.getClass().getName());
 
-        if (record.getSchema().getSchemaInfo().getType().equals(SchemaType.KEY_VALUE)) {
+        if (schema != null && schema.getSchemaInfo().getType().equals(SchemaType.KEY_VALUE)) {
             Object value = object == null ? null : ((KeyValue)object).getValue();
             Object key = object == null ? record.getKey().get() : ((KeyValue)object).getKey();
 
-            if (key instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
-                key = ((org.apache.pulsar.client.api.schema.GenericRecord)key).getNativeObject();
+            if (key instanceof org.apache.pulsar.client.api.schema.GenericObject) {
+                key = ((org.apache.pulsar.client.api.schema.GenericObject)key).getNativeObject();
             }
-            if (value != null && value instanceof org.apache.pulsar.client.api.schema.GenericRecord) {
-                value = ((org.apache.pulsar.client.api.schema.GenericRecord)value).getNativeObject();
+            if (value != null && value instanceof org.apache.pulsar.client.api.schema.GenericObject) {
+                value = ((org.apache.pulsar.client.api.schema.GenericObject)value).getNativeObject();
             }
             LOG.warn("transforming3 valueClass={} value={} keyClass={} key={}",
                     value == null ? null : value.getClass().getName(), value,
                     key == null ? null : key.getClass().getName(), key);
             if (value  instanceof GenericData.Record) {
-                GenericData.Record inKey = (GenericData.Record) key;
                 GenericData.Record inValue = (GenericData.Record) value;
                 org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(inValue.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
                 TreeMap props = new TreeMap<>();
@@ -282,8 +284,9 @@ public class RenameFields implements Transformation<GenericObject> {
                 }
                 final org.apache.avro.generic.GenericRecord outGenericRecord = rebuidRecord(avroSchema, new LinkedList<>(props.entrySet()), "");
                 final Object outKey = key;
+                final Schema outKeySchema = key instanceof GenericData.Record ? new AvroSchemaWrapper( ((GenericData.Record)key).getSchema()) : Schema.BYTES;
                 MyKVGenericRecord transformedRecord = new MyKVGenericRecord(record,
-                        new AvroSchemaWrapper(inKey.getSchema()),
+                        outKeySchema,
                         new AvroSchemaWrapper(avroSchema),
                         new GenericObject() {
                             @Override
@@ -293,12 +296,12 @@ public class RenameFields implements Transformation<GenericObject> {
 
                             @Override
                             public Object getNativeObject() {
-                                return new KeyValue(new GenericObject()
+                                return new KeyValue(outKeySchema.equals(Schema.BYTES) ? outKey: new GenericObject()
                                 {
                                     @Override
                                     public SchemaType getSchemaType()
                                     {
-                                        return SchemaType.AVRO;
+                                        return outKeySchema.getSchemaInfo().getType();
                                     }
 
                                     @Override
