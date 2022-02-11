@@ -100,9 +100,4 @@ public class AvroSchemaWrapper implements org.apache.pulsar.client.api.Schema<Ge
     public void configureSchemaInfo(String topic, String componentName, SchemaInfo schemaInfo) {
 
     }
-
-    @Override
-    public Optional<Object> getNativeSchema() {
-        return Optional.of(nativeAvroSchema);
-    }
 }
