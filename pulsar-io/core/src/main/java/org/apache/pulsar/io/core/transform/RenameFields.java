@@ -34,23 +34,86 @@ public class RenameFields implements Transformation<GenericObject> {
         org.apache.avro.Schema keyOrValueAvroSchema;
     }
 
+    @AllArgsConstructor
+    private class MyGenericObject implements GenericObject {
+        SchemaType schemaType;
+        Object nativeObject;
+
+        @Override
+        public SchemaType getSchemaType()
+        {
+            return schemaType;
+        }
+
+        @Override
+        public Object getNativeObject()
+        {
+            return nativeObject;
+        }
+
+        @Override
+        public String toString() {
+            return nativeObject.toString();
+        }
+    }
+
+    @AllArgsConstructor
+    private class MyRecord implements Record {
+        private final Record record;
+        private final Schema schema;
+        private final GenericObject genericObject;
+
+        @Override
+        public Object getValue() {
+            return genericObject;
+        }
+
+        @Override
+        public Schema getSchema() {
+            return schema;
+        }
+
+        /**
+         * Acknowledge that this record is fully processed.
+         */
+        public void ack() {
+            record.ack();
+        }
+
+        /**
+         * To indicate that this record has failed to be processed.
+         */
+        public void fail() {
+            record.fail();
+        }
+
+        /**
+         * To support message routing on a per message basis.
+         *
+         * @return The topic this message should be written to
+         */
+        public Optional<String> getDestinationTopic() {
+            return record.getDestinationTopic();
+        }
+
+        public Optional<Message> getMessage() {
+            return record.getMessage();
+        }
+
+        @Override
+        public String toString() {
+            return genericObject.toString();
+        }
+    }
+
     // record wrapper with the replaced schema and value
+    @AllArgsConstructor
     private class MyKVGenericRecord implements KVRecord
     {
         private final Record record;
         private final Schema keySchema;
         private final Schema valueSchema;
         private final GenericObject genericKeyValue;
-
-        public MyKVGenericRecord(Record record,
-                                 Schema keySchema,
-                                 Schema valueSchema,
-                                 GenericObject keyValue) {
-            this.record = record;
-            this.keySchema = keySchema;
-            this.valueSchema = valueSchema;
-            this.genericKeyValue = keyValue;
-        }
 
         @Override
         public Optional<String> getTopicName() {
@@ -206,12 +269,12 @@ public class RenameFields implements Transformation<GenericObject> {
                         .collect(Collectors.toList()));
     }
 
-    TreeMap<String, Object> falltenRecord(TreeMap<String, Object> map, String path, org.apache.avro.generic.GenericRecord genericRecord) {
+    TreeMap<String, Object> flattenRecord(TreeMap<String, Object> map, String path, org.apache.avro.generic.GenericRecord genericRecord) {
         for(org.apache.avro.Schema.Field field : genericRecord.getSchema().getFields()) {
             Object value = genericRecord.get(field.name());
             String key = path.length() > 0 ? path + "." + field.name() : field.name();
             if (value instanceof org.apache.avro.generic.GenericRecord) {
-                falltenRecord(map, key, (org.apache.avro.generic.GenericRecord) value);
+                flattenRecord(map, key, (org.apache.avro.generic.GenericRecord) value);
             } else {
                 map.put(key, value);
             }
@@ -242,95 +305,97 @@ public class RenameFields implements Transformation<GenericObject> {
 
     @Override
     public Record<GenericObject> apply(Record<GenericObject> record) {
-        //  update the local schema if obsolete
         Object object = record.getValue();
         Schema schema = record.getSchema();
 
-        LOG.warn("transforming class={} record={} schemaType={} schemaClass={}",
-                object == null ? null : object.getClass().getName(), object,
-                schema == null ? null : schema.getSchemaInfo().getType(), schema == null ? null : schema.getClass().getName());
-        if (schema != null && schema.getNativeSchema().isPresent()) {
-            schema = (Schema) schema.getNativeSchema().get();
-        }
+        LOG.warn("transforming class={} record={} schema={}", object == null ? null : object.getClass().getName(), object, schema);
         if (object != null && object instanceof org.apache.pulsar.client.api.schema.GenericObject) {
             object = ((org.apache.pulsar.client.api.schema.GenericObject)object).getNativeObject();
         }
-        LOG.warn("transforming2 class={} record={} schemaType={} schemaClass={}",
-                object == null ? null : object.getClass().getName(), object,
-                schema == null ? null : schema.getSchemaInfo().getType(), schema == null ? null : schema.getClass().getName());
+        if (schema != null && schema.getNativeSchema().isPresent()) {
+            schema = (Schema) schema.getNativeSchema().get();
+        }
+        LOG.warn("transforming2 class={} record={} schema={}", object == null ? null : object.getClass().getName(), object, schema);
 
+        TreeMap keyProps = new TreeMap<>();
+        TreeMap valueProps = new TreeMap<>();
+        Schema keySchema = null, valueSchema =  null;
+        org.apache.avro.Schema keyAvroSchema = null, valueAvroSchema = null;
+        Object key = null, value = null;
+
+        // flatten record
         if (schema != null && schema.getSchemaInfo().getType().equals(SchemaType.KEY_VALUE)) {
-            Object value = object == null ? null : ((KeyValue)object).getValue();
-            Object key = object == null ? record.getKey().get() : ((KeyValue)object).getKey();
+            value = object == null ? null : ((KeyValue) object).getValue();
+            key = object == null ? record.getKey().get() : ((KeyValue) object).getKey();
 
             if (key instanceof org.apache.pulsar.client.api.schema.GenericObject) {
-                key = ((org.apache.pulsar.client.api.schema.GenericObject)key).getNativeObject();
+                key = ((org.apache.pulsar.client.api.schema.GenericObject) key).getNativeObject();
             }
             if (value != null && value instanceof org.apache.pulsar.client.api.schema.GenericObject) {
-                value = ((org.apache.pulsar.client.api.schema.GenericObject)value).getNativeObject();
+                value = ((org.apache.pulsar.client.api.schema.GenericObject) value).getNativeObject();
             }
             LOG.warn("transforming3 valueClass={} value={} keyClass={} key={}",
                     value == null ? null : value.getClass().getName(), value,
                     key == null ? null : key.getClass().getName(), key);
-            if (value  instanceof GenericData.Record) {
+
+            if (key instanceof GenericData.Record) {
+                GenericData.Record inKey = (GenericData.Record) key;
+                keyAvroSchema = maybeUpdateAvroSchema(inKey.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
+                flattenRecord(keyProps, "", inKey);
+            }
+            if (value instanceof GenericData.Record) {
                 GenericData.Record inValue = (GenericData.Record) value;
-                org.apache.avro.Schema avroSchema = maybeUpdateAvroSchema(inValue.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
-                TreeMap props = new TreeMap<>();
-                falltenRecord(props, "", inValue);
-                for(int i = 0; i < sources.size(); i++) {
-                    Object v = props.remove(sources.get(i));
-                    if (v != null)
-                        props.put(targets.get(i), v);
-                }
-                final org.apache.avro.generic.GenericRecord outGenericRecord = rebuidRecord(avroSchema, new LinkedList<>(props.entrySet()), "");
-                final Object outKey = key;
-                final Schema outKeySchema = key instanceof GenericData.Record ? new AvroSchemaWrapper( ((GenericData.Record)key).getSchema()) : Schema.BYTES;
-                MyKVGenericRecord transformedRecord = new MyKVGenericRecord(record,
-                        outKeySchema,
-                        new AvroSchemaWrapper(avroSchema),
-                        new GenericObject() {
-                            @Override
-                            public SchemaType getSchemaType() {
-                                return SchemaType.KEY_VALUE;
-                            }
-
-                            @Override
-                            public Object getNativeObject() {
-                                return new KeyValue(outKeySchema.equals(Schema.BYTES) ? outKey: new GenericObject()
-                                {
-                                    @Override
-                                    public SchemaType getSchemaType()
-                                    {
-                                        return outKeySchema.getSchemaInfo().getType();
-                                    }
-
-                                    @Override
-                                    public Object getNativeObject()
-                                    {
-                                        return outKey;
-                                    }
-                                }, new GenericObject()
-                                {
-                                    @Override
-                                    public SchemaType getSchemaType()
-                                    {
-                                        return SchemaType.AVRO;
-                                    }
-
-                                    @Override
-                                    public Object getNativeObject()
-                                    {
-                                        return outGenericRecord;
-                                    }
-                                });
-                            }
-                        });
-                LOG.warn("transformedRecord={} class={}", transformedRecord, transformedRecord.getClass().getName());
-                return transformedRecord;
+                valueAvroSchema = maybeUpdateAvroSchema(inValue.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
+                flattenRecord(valueProps, "", inValue);
+            }
+        } else {
+            if (object instanceof GenericData.Record) {
+                GenericData.Record inValue = (GenericData.Record) object;
+                valueAvroSchema = maybeUpdateAvroSchema(inValue.getSchema(), record.getMessage().isPresent() ? record.getMessage().get().getSchemaVersion() : null);
+                flattenRecord(valueProps, "", inValue);
+            } else {
+                // no transformation
+                return record;
             }
         }
-        LOG.warn("Unchanged record={}  class={}", record, record.getClass().getName());
-        return record;
+
+        // TODO: support copy/move field key <-> value
+        // apply key transformations
+        for(int i = 0; i < sources.size(); i++) {
+            Object v = keyProps.remove(sources.get(i));
+            if (v != null)
+                keyProps.put(targets.get(i), v);
+        }
+        // apply value transformations
+        for(int i = 0; i < sources.size(); i++) {
+            Object v = valueProps.remove(sources.get(i));
+            if (v != null)
+                valueProps.put(targets.get(i), v);
+        }
+
+        // rebuild output
+        if (schema != null && schema.getSchemaInfo().getType().equals(SchemaType.KEY_VALUE)) {
+            if (key instanceof GenericData.Record) {
+                keySchema = new AvroSchemaWrapper(keyAvroSchema);
+                key = new MyGenericObject(SchemaType.AVRO, rebuidRecord(keyAvroSchema, new LinkedList<>(keyProps.entrySet()), ""));
+            } else {
+                keySchema = Schema.BYTES; // TODO: should retrieve the key schema
+            }
+            if (value instanceof GenericData.Record) {
+                valueSchema = new AvroSchemaWrapper(valueAvroSchema);
+                value = new MyGenericObject(SchemaType.AVRO, rebuidRecord(valueAvroSchema, new LinkedList<>(valueProps.entrySet()), ""));
+            } else {
+                valueSchema = Schema.BYTES; // TODO: should retrieve the value schema
+            }
+            MyKVGenericRecord transformedRecord = new MyKVGenericRecord(record,
+                    keySchema, valueSchema, new MyGenericObject(SchemaType.KEY_VALUE, new KeyValue(key, value)));
+            LOG.warn("Outpout record={}  class={}", transformedRecord, transformedRecord.getClass().getName());
+            return transformedRecord;
+        }
+        valueSchema = new AvroSchemaWrapper(valueAvroSchema);
+        MyRecord genericRecord = new MyRecord(record, valueSchema, new MyGenericObject(SchemaType.AVRO, rebuidRecord(valueAvroSchema, new LinkedList<>(valueProps.entrySet()), "")));
+        LOG.warn("Outpout record={}  class={}", genericRecord, genericRecord.getClass().getName());
+        return genericRecord;
     }
 
     @Override

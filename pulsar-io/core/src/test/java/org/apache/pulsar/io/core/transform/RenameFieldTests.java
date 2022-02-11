@@ -9,6 +9,7 @@ import org.apache.avro.specific.SpecificDatumWriter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.schema.GenericObject;
 import org.apache.pulsar.functions.api.Record;
 import org.junit.Test;
 
@@ -88,7 +89,8 @@ public class RenameFieldTests
 
         Record result = renameFields.apply(testRecord);
 
-        GenericData.Record outGenericRecord = (GenericData.Record) result.getValue();
+        GenericObject genericObject = (GenericObject) result.getValue();
+        GenericData.Record outGenericRecord = (GenericData.Record) genericObject.getNativeObject();
         assertEquals("aaa", outGenericRecord.get("b").toString());
         GenericData.Record outGenericRecordX = (GenericData.Record) outGenericRecord.get("x");
         assertEquals("xx1", outGenericRecordX.get("xx1").toString());

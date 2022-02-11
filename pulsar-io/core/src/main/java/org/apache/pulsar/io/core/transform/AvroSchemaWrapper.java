@@ -36,10 +36,8 @@ public class AvroSchemaWrapper implements org.apache.pulsar.client.api.Schema<Ge
         return serialize((GenericRecord) genericObject.getNativeObject(), this.nativeAvroSchema);
     }
 
-    public static byte[] serialize(GenericRecord record, org.apache.avro.Schema schema)
-    {
-        try
-        {
+    public static byte[] serialize(GenericRecord record, org.apache.avro.Schema schema) {
+        try {
             SpecificDatumWriter<GenericRecord> datumWriter = new SpecificDatumWriter<>(schema);
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             BinaryEncoder binaryEncoder = new EncoderFactory().binaryEncoder(byteArrayOutputStream, null);

@@ -114,8 +114,8 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
 
     private Record<?> currentRecord;
 
-    private Source<?> source;
-    private Sink<?> sink;
+    private Source source;
+    private Sink sink;
 
     private final SecretsProvider secretsProvider;
 
