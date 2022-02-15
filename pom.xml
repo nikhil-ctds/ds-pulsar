@@ -1858,9 +1858,9 @@ flexible messaging model and an intuitive client API.</description>
             <configuration>
               <!-- collect coverage only for Pulsar classes -->
               <includes>
-                <include>org.apache.pulsar.*</include>
+                <include>**/org/apache/pulsar/*</include>
                 <!-- Pulsar's Managed Ledger uses this package name -->
-                <include>org.apache.bookkeeper.mledger.*</include>
+                <include>**/org/apache/bookkeeper/mledger/*</include>
               </includes>
               <propertyName>jacoco.agent.argument</propertyName>
             </configuration>
