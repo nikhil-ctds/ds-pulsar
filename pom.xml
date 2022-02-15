@@ -1831,10 +1831,37 @@ flexible messaging model and an intuitive client API.</description>
       <build>
         <plugins>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>lombok-config</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <propertyfile file="${pulsar.basedir}/lombok.config">
+                      <entry key="config.stopBubbling" value="true" />
+                      <entry key="lombok.addLombokGeneratedAnnotation" value="true" />
+                    </propertyfile>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
             <groupId>org.jacoco</groupId>
             <artifactId>jacoco-maven-plugin</artifactId>
             <version>${jacoco-maven-plugin.version}</version>
             <configuration>
+              <!-- collect coverage only for Pulsar classes -->
+              <includes>
+                <include>org.apache.pulsar.*</include>
+                <!-- Pulsar's Managed Ledger uses this package name -->
+                <include>org.apache.bookkeeper.mledger.*</include>
+              </includes>
               <propertyName>jacoco.agent.argument</propertyName>
             </configuration>
             <executions>
@@ -1851,7 +1878,7 @@ flexible messaging model and an intuitive client API.</description>
                   <goal>report</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>target/report</outputDirectory>
+                  <outputDirectory>target/jacoco</outputDirectory>
                 </configuration>
               </execution>
             </executions>
