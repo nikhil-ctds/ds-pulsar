@@ -31,7 +31,7 @@ RUN apt-get update && \
                 liblog4cxx-dev libprotobuf-dev google-mock libgtest-dev \
                 libboost-dev libboost-program-options-dev libboost-system-dev libboost-python-dev \
                 libxml2-utils protobuf-compiler wget \
-                curl doxygen openjdk-8-jdk-headless openjdk-11-jdk-headless clang-format-5.0 \
+                curl doxygen openjdk-8-jdk-headless openjdk-17-jdk-headless clang-format-5.0 \
                 gnupg2 golang-1.13-go zip unzip libzstd-dev libsnappy-dev python3-pip libpython-dev
 
 # Compile and install gtest
@@ -44,7 +44,7 @@ RUN cd /usr/src/gmock && cmake . && make && cp libgmock.a /usr/lib
 RUN git clone https://github.com/google/gtest-parallel.git
 
 ENV JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
-ENV JAVA_HOME_11=/usr/lib/jvm/java-1.11.0-openjdk-amd64
+ENV JAVA_HOME_11=/usr/lib/jvm/java-1.17.0-openjdk-amd64
 
 ## Website build dependencies
 
