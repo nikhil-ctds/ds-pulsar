@@ -18,19 +18,31 @@
  */
 package org.apache.pulsar.broker.service;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.assertNotNull;
+
 import com.google.common.collect.Lists;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import lombok.Cleanup;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.Reader;
+import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
+import org.apache.pulsar.common.policies.data.InactiveTopicPolicies;
 import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats.CursorStats;
 import org.apache.pulsar.common.policies.data.PersistentTopicInternalStats;
+import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.awaitility.Awaitility;
+import org.powermock.reflect.Whitebox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static org.testng.Assert.assertEquals;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -99,6 +111,72 @@ public class MessageTTLTest extends BrokerTestBase {
         CursorStats statsAfterExpire = internalStatsAfterExpire.cursors.get(subscriptionName);
         log.info("markDeletePosition after expire {}", statsAfterExpire.markDeletePosition);
         assertEquals(statsAfterExpire.markDeletePosition, PositionImpl.get(3, numMsgs - 1 ).toString());
+
+    }
+
+    @Test
+    public void testMessageExpiryAfterTopicUnloadAndThenOpenReader() throws Exception {
+        int numMsgs = 100;
+
+        String namespace = "prop/ns-abc-ttl";
+        admin.namespaces().createNamespace(namespace);
+        admin.namespaces().setRetention(namespace,
+                new RetentionPolicies(0, 0));
+        admin.namespaces().setInactiveTopicPolicies(namespace, new InactiveTopicPolicies(
+                InactiveTopicDeleteMode.delete_when_no_subscriptions, Integer.MAX_VALUE, false));
+        admin.namespaces().setNamespaceMessageTTL(namespace, 1);
+
+        String topicName = namespace + "/testMessageExpiryAfterTopicUnloadOpenReader";
+        // we need a non-partitioned topic
+        admin.topics().createNonPartitionedTopic(topicName);
+
+        Producer<byte[]> producer = pulsarClient.newProducer().topic(topicName)
+                .enableBatching(false) // this makes the test easier and predictable
+                .create();
+
+        List<CompletableFuture<MessageId>> sendFutureList = Lists.newArrayList();
+        for (int i = 0; i < numMsgs; i++) {
+            byte[] message = ("my-message-" + i).getBytes();
+            sendFutureList.add(producer.sendAsync(message));
+        }
+        FutureUtil.waitForAll(sendFutureList).get();
+        producer.close();
+        // unload and reload the topic
+        // this action created a new ledger
+        // having a managed ledger with more than one
+        // ledger should not impact message expiration
+        admin.topics().unload(topicName);
+        admin.topics().getStats(topicName);
+
+        PersistentTopicInternalStats stats = admin.topics().getInternalStats(topicName);
+        log.info("stats {}", stats);
+        Whitebox.invokeMethod(pulsar.getBrokerService(),"checkConsumedLedgers");
+
+        // wait for topic to be automatically deleted
+        Awaitility
+                .await()
+                .pollInterval(5, TimeUnit.SECONDS)
+                .untilAsserted(
+                        () -> {
+                            Whitebox.invokeMethod(pulsar.getBrokerService(),"checkConsumedLedgers");
+                            PersistentTopicInternalStats stats2 = admin.topics().getInternalStats(topicName);
+                            log.info("stats2 {}", stats2);
+                            assertEquals(0, stats2.numberOfEntries);
+                        });
+
+        @Cleanup
+        Reader<byte[]> reader = pulsarClient
+                .newReader()
+                .startMessageId(MessageId.earliest)
+                .topic(topicName)
+                .startMessageIdInclusive()
+                .readCompacted(true)
+                .create();
+
+        for (int i = 0; i < numMsgs; i++) {
+            assertTrue(reader.hasMessageAvailable());
+            assertNotNull(reader.readNext(1, TimeUnit.SECONDS));
+        }
 
     }
 
