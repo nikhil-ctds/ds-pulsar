@@ -1774,36 +1774,6 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         });
     }
 
-    private CompletableFuture<Boolean> isNamespaceOperationAllowed(NamespaceName namespaceName,
-                                                                   NamespaceOperation operation) {
-        CompletableFuture<Boolean> isProxyAuthorizedFuture;
-        CompletableFuture<Boolean> isAuthorizedFuture;
-        if (service.isAuthorizationEnabled()) {
-            if (originalPrincipal != null) {
-                isProxyAuthorizedFuture = service.getAuthorizationService().allowNamespaceOperationAsync(
-                        namespaceName, operation, originalPrincipal, getAuthenticationData());
-            } else {
-                isProxyAuthorizedFuture = CompletableFuture.completedFuture(true);
-            }
-            isAuthorizedFuture = service.getAuthorizationService().allowNamespaceOperationAsync(
-                    namespaceName, operation, authRole, authenticationData);
-        } else {
-            isProxyAuthorizedFuture = CompletableFuture.completedFuture(true);
-            isAuthorizedFuture = CompletableFuture.completedFuture(true);
-        }
-        return isProxyAuthorizedFuture.thenCombine(isAuthorizedFuture, (isProxyAuthorized, isAuthorized) -> {
-            if (!isProxyAuthorized) {
-                log.warn("OriginalRole {} is not authorized to perform operation {} on namespace {}",
-                        originalPrincipal, operation, namespaceName);
-            }
-            if (!isAuthorized) {
-                log.warn("Role {} is not authorized to perform operation {} on namespace {}",
-                        authRole, operation, namespaceName);
-            }
-            return isProxyAuthorized && isAuthorized;
-        });
-    }
-
     @Override
     protected void handleGetTopicsOfNamespace(CommandGetTopicsOfNamespace commandGetTopicsOfNamespace) {
         final long requestId = commandGetTopicsOfNamespace.getRequestId();
