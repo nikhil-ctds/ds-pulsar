@@ -169,7 +169,7 @@ public class MessageTTLTest extends BrokerTestBase {
                 .startMessageId(MessageId.earliest)
                 .topic(topicName)
                 .startMessageIdInclusive()
-                .readCompacted(true)
+                .readCompacted(false)
                 .create();
         assertFalse(reader.hasMessageAvailable());
     }
