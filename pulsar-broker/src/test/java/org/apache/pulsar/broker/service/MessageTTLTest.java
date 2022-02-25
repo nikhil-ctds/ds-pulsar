@@ -18,8 +18,7 @@
  */
 package org.apache.pulsar.broker.service;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 import static org.testng.AssertJUnit.assertNotNull;
 
 import com.google.common.collect.Lists;
@@ -172,12 +171,7 @@ public class MessageTTLTest extends BrokerTestBase {
                 .startMessageIdInclusive()
                 .readCompacted(true)
                 .create();
-
-        for (int i = 0; i < numMsgs; i++) {
-            assertTrue(reader.hasMessageAvailable());
-            assertNotNull(reader.readNext(1, TimeUnit.SECONDS));
-        }
-
+        assertFalse(reader.hasMessageAvailable());
     }
 
 }
