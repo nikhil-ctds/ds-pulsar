@@ -465,6 +465,14 @@ flexible messaging model and an intuitive client API.</description>
           </exclusion>
           <exclusion>
             <groupId>io.grpc</groupId>
+            <artifactId>grpc-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-alts</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.grpc</groupId>
             <artifactId>grpc-testing</artifactId>
           </exclusion>
           <exclusion>
