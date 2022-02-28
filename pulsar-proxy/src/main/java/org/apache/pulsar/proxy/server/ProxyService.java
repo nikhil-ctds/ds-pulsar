@@ -295,7 +295,7 @@ public class ProxyService implements Closeable {
             EventLoopUtil.enableTriggeredMode(bootstrap);
             DefaultThreadFactory defaultThreadFactory = new DefaultThreadFactory("pulsar-ext-" + extensionName);
             EventLoopGroup dedicatedWorkerGroup =
-                    EventLoopUtil.newEventLoopGroup(numThreads, false, defaultThreadFactory);
+                    EventLoopUtil.newEventLoopGroup(proxyConfig.getNumIOThreads(), false, defaultThreadFactory);
             extensionsWorkerGroups.add(dedicatedWorkerGroup);
             bootstrap.channel(EventLoopUtil.getServerSocketChannelClass(dedicatedWorkerGroup));
             bootstrap.group(this.acceptorGroup, dedicatedWorkerGroup);
@@ -357,9 +357,6 @@ public class ProxyService implements Closeable {
         workerGroup.shutdownGracefully();
         for (EventLoopGroup group : extensionsWorkerGroups) {
             group.shutdownGracefully();
-        }
-        if (timer != null) {
-            timer.stop();
         }
     }
 

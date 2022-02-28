@@ -22,8 +22,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 import com.google.common.io.Files;
 import java.io.File;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import lombok.Cleanup;
@@ -40,7 +42,6 @@ import org.apache.pulsar.tests.integration.containers.ZKContainer;
 import org.apache.pulsar.tests.integration.topologies.PulsarCluster;
 import org.apache.pulsar.tests.integration.topologies.PulsarClusterSpec;
 import org.apache.pulsar.tests.integration.utils.DockerUtils;
-import org.elasticsearch.common.collect.Set;
 import org.testcontainers.containers.Network;
 import org.testcontainers.shaded.org.apache.commons.lang.RandomStringUtils;
 import org.testng.annotations.AfterClass;
@@ -199,7 +200,7 @@ public class GetTopicsOfNamespaceWithAuthTest extends TestRetrySupport {
 
         // grant consume permission to the role
         superUserAdmin.namespaces().grantPermissionOnNamespace("public/default",
-                REGULAR_USER_ROLE, Set.of(AuthAction.consume));
+                REGULAR_USER_ROLE, new HashSet<>(Arrays.asList(AuthAction.consume)));
 
         // then do some get topics operations again, it should success
         List<String> topics = clientAdmin.namespaces().getTopics("public/default");
