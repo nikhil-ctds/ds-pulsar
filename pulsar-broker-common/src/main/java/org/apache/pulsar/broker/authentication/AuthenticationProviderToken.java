@@ -166,6 +166,11 @@ public class AuthenticationProviderToken implements AuthenticationProvider {
         return new TokenAuthenticationState(this, authData, remoteAddress, sslSession);
     }
 
+    @Override
+    public AuthenticationState newHttpAuthState(HttpServletRequest request) throws AuthenticationException {
+        return new TokenAuthenticationState(this, request);
+    }
+
     public static String getToken(AuthenticationDataSource authData) throws AuthenticationException {
         if (authData.hasDataFromCommand()) {
             // Authenticate Pulsar binary connection
@@ -311,8 +316,6 @@ public class AuthenticationProviderToken implements AuthenticationProvider {
         private final AuthenticationProviderToken provider;
         private AuthenticationDataSource authenticationDataSource;
         private Jwt<?, Claims> jwt;
-        private final SocketAddress remoteAddress;
-        private final SSLSession sslSession;
         private long expiration;
 
         TokenAuthenticationState(
@@ -321,9 +324,24 @@ public class AuthenticationProviderToken implements AuthenticationProvider {
                 SocketAddress remoteAddress,
                 SSLSession sslSession) throws AuthenticationException {
             this.provider = provider;
-            this.remoteAddress = remoteAddress;
-            this.sslSession = sslSession;
-            this.authenticate(authData);
+            String token = new String(authData.getBytes(), UTF_8);
+            this.authenticationDataSource = new AuthenticationDataCommand(token, remoteAddress, sslSession);
+            this.checkExpiration(token);
+        }
+
+        TokenAuthenticationState(
+                AuthenticationProviderToken provider,
+                HttpServletRequest request) throws AuthenticationException {
+            this.provider = provider;
+            String httpHeaderValue = request.getHeader(HTTP_HEADER_NAME);
+            if (httpHeaderValue == null || !httpHeaderValue.startsWith(HTTP_HEADER_VALUE_PREFIX)) {
+                throw new AuthenticationException("Invalid HTTP Authorization header");
+            }
+
+            // Remove prefix
+            String token = httpHeaderValue.substring(HTTP_HEADER_VALUE_PREFIX.length());
+            this.authenticationDataSource = new AuthenticationDataHttps(request);
+            this.checkExpiration(token);
         }
 
         @Override
@@ -331,21 +349,25 @@ public class AuthenticationProviderToken implements AuthenticationProvider {
             return provider.getPrincipal(jwt);
         }
 
+        /**
+         * @param authData Authentication data.
+         * @return null. Explanation of returning null values, {@link AuthenticationState#authenticateAsync(AuthData)}
+         * @throws AuthenticationException
+         */
         @Override
         public AuthData authenticate(AuthData authData) throws AuthenticationException {
-            String token = new String(authData.getBytes(), UTF_8);
+            // There's no additional auth stage required
+            return null;
+        }
 
+        private void checkExpiration(String token) throws AuthenticationException {
             this.jwt = provider.authenticateToken(token);
-            this.authenticationDataSource = new AuthenticationDataCommand(token, remoteAddress, sslSession);
             if (jwt.getBody().getExpiration() != null) {
                 this.expiration = jwt.getBody().getExpiration().getTime();
             } else {
                 // Disable expiration
                 this.expiration = Long.MAX_VALUE;
             }
-
-            // There's no additional auth stage required
-            return null;
         }
 
         @Override
