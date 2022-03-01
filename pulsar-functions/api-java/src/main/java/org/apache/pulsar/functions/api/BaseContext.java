@@ -19,6 +19,7 @@
 package org.apache.pulsar.functions.api;
 
 import org.apache.pulsar.client.api.ClientBuilder;
+import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.common.classification.InterfaceAudience;
 import org.apache.pulsar.common.classification.InterfaceStability;
 import org.slf4j.Logger;
@@ -192,6 +193,18 @@ public interface BaseContext {
      * @param value The value of the metric
      */
     void recordMetric(String metricName, double value);
+
+    /**
+     * Get the pre-configured pulsar client.
+     *
+     * You can use this client to access Pulsar cluster.
+     * The Function will be responsible for disposing this client.
+     *
+     * @return the instance of pulsar client
+     */
+    default PulsarClient getPulsarClient() {
+        throw new UnsupportedOperationException("not implemented");
+    }
 
     /**
      * Get the pre-configured pulsar client builder.
