@@ -26,6 +26,7 @@ import java.util.function.Predicate;
 
 /**
  * Applies the transformation if the predicate is true.
+ * Transformation should not alter the message key to avoid message processing issues.
  * @param <T>
  */
 public interface Transformation<T> extends Predicate<Record<T>> {

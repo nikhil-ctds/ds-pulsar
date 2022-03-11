@@ -126,6 +126,13 @@ For more information about the options of `pulsar-admin sinks update`, see [here
 
 <!--END_DOCUSAURUS_CODE_TABS-->
 
+## Simple Message Transformations
+
+Simple Message Transformations (SMTs) provide a configurable way to transform messages as they flow through Pulsar-IO: 
+* SMTs transform outbound records from a topic before writing through a sink connector. 
+* SMTs transform inbound records from a source connector before writing into a topic.
+
+
 
 ## Work with connector
 
