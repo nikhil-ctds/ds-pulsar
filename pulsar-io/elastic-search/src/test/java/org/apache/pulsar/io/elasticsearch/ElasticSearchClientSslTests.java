@@ -37,9 +37,9 @@ public class ElasticSearchClientSslTests extends ElasticSearchTestBase {
     final static String sslResourceDir = MountableFile.forClasspathResource("ssl").getFilesystemPath();
     final static  String configDir = "/usr/share/elasticsearch/config";
 
-    @Test
-    public void testSslBasic() throws IOException {
-        try (ElasticsearchContainer container = createElasticsearchContainer()
+    @Test(dataProvider = "elasticImage")
+    public void testSslBasic(String image) throws IOException {
+        try (ElasticsearchContainer container = createElasticsearchContainer(image)
                 .withFileSystemBind(sslResourceDir, configDir + "/ssl")
                 .withPassword("elastic")
                 .withEnv("xpack.license.self_generated.type", "trial")
@@ -72,9 +72,9 @@ public class ElasticSearchClientSslTests extends ElasticSearchTestBase {
         }
     }
 
-    @Test
-    public void testSslWithHostnameVerification() throws IOException {
-        try (ElasticsearchContainer container = createElasticsearchContainer()
+    @Test(dataProvider = "elasticImage")
+    public void testSslWithHostnameVerification(String image) throws IOException {
+        try (ElasticsearchContainer container = createElasticsearchContainer(image)
                 .withFileSystemBind(sslResourceDir, configDir + "/ssl")
                 .withPassword("elastic")
                 .withEnv("xpack.license.self_generated.type", "trial")
@@ -110,9 +110,9 @@ public class ElasticSearchClientSslTests extends ElasticSearchTestBase {
         }
     }
 
-    @Test
-    public void testSslWithClientAuth() throws IOException {
-        try(ElasticsearchContainer container = createElasticsearchContainer()
+    @Test(dataProvider = "elasticImage")
+    public void testSslWithClientAuth(String image) throws IOException {
+        try (ElasticsearchContainer container = createElasticsearchContainer(image)
                 .withFileSystemBind(sslResourceDir, configDir + "/ssl")
                 .withPassword("elastic")
                 .withEnv("xpack.license.self_generated.type", "trial")

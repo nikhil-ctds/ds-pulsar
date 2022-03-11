@@ -67,7 +67,11 @@ public class RandomExponentialRetry {
         for(int i = 0; i < maxAttempts || maxAttempts == -1; i++) {
             try {
                 return function.call();
+            } catch (StopRetryException e) {
+                // Keep last exception
+                log.info("Got stop retry request source={} at attempt {}/{}", source, i, maxAttempts);
             } catch (Exception e) {
+                e.printStackTrace();
                 lastException = e;
                 long backoff = randomWaitInMs(i, initialBackoff);
                 log.info("Trying source={} attempt {}/{} failed, waiting {}ms", source, i, maxAttempts, backoff);
@@ -81,6 +85,12 @@ public class RandomExponentialRetry {
     public static class Time {
         void sleep(long millis) throws InterruptedException {
             Thread.sleep(millis);
+        }
+    }
+
+    public static final class StopRetryException extends Exception {
+        public StopRetryException(String message) {
+            super(message);
         }
     }
 }

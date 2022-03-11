@@ -51,8 +51,6 @@ import static org.testng.Assert.assertNull;
 
 public class ElasticSearchSinkTests extends ElasticSearchTestBase {
 
-    private static ElasticsearchContainer container;
-
     @Mock
     protected Record<GenericObject> mockRecord;
 
@@ -68,8 +66,6 @@ public class ElasticSearchSinkTests extends ElasticSearchTestBase {
 
     @BeforeClass
     public static final void initBeforeClass() {
-        container = createElasticsearchContainer();
-
         valueSchema = Schema.JSON(UserProfile.class);
         genericSchema = GenericJsonSchema.of(valueSchema.getSchemaInfo());
         userProfile = genericSchema.newRecordBuilder()
@@ -81,18 +77,10 @@ public class ElasticSearchSinkTests extends ElasticSearchTestBase {
 
     }
 
-    @AfterClass(alwaysRun = true)
-    public static void closeAfterClass() {
-        container.close();
-    }
-
     @SuppressWarnings("unchecked")
     @BeforeMethod
     public final void setUp() throws Exception {
-        container.start();
-
         map = new HashMap<String, Object> ();
-        map.put("elasticSearchUrl", "http://"+container.getHttpHostAddress());
         map.put("schemaEnable", "true");
         sink = new ElasticSearchSink();
 
@@ -134,58 +122,68 @@ public class ElasticSearchSinkTests extends ElasticSearchTestBase {
     }
 
     @Test(enabled = true, expectedExceptions = IllegalArgumentException.class)
-    public final void invalidIndexNameTest() throws Exception {
+    public final void invalidIndexNameTest(String image) throws Exception {
         map.put("indexName", "myIndex");
         sink.open(map, mockSinkContext);
     }
 
-    @Test(enabled = true)
-    public final void createIndexTest() throws Exception {
-        map.put("indexName", "test-index");
-        sink.open(map, mockSinkContext);
-        send(1);
+    @Test(dataProvider = "elasticImage")
+    public final void createIndexTest(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            map.put("indexName", "test-index");
+            sink.open(map, mockSinkContext);
+            send(1);
+        }
     }
 
-    @Test(enabled = true)
-    public final void singleRecordTest() throws Exception {
-        map.put("indexName", "test-index");
-        sink.open(map, mockSinkContext);
-        send(1);
-        verify(mockRecord, times(1)).ack();
+    @Test(dataProvider = "elasticImage")
+    public final void singleRecordTest(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            map.put("indexName", "test-index");
+            sink.open(map, mockSinkContext);
+            send(1);
+            verify(mockRecord, times(1)).ack();
+        }
     }
 
-    @Test(enabled = true)
-    public final void send100Test() throws Exception {
-        map.put("indexName", "test-index");
-        sink.open(map, mockSinkContext);
-        send(100);
-        verify(mockRecord, times(100)).ack();
+    @Test(dataProvider = "elasticImage")
+    public final void send100Test(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            map.put("indexName", "test-index");
+            sink.open(map, mockSinkContext);
+            send(100);
+            verify(mockRecord, times(100)).ack();
+        }
     }
 
-    @Test(enabled = true)
-    public final void sendKeyIgnoreSingleField() throws Exception {
-        final String index = "testkeyignore";
-        map.put("indexName", index);
-        map.put("keyIgnore", "true");
-        map.put("primaryFields", "name");
-        sink.open(map, mockSinkContext);
-        send(1);
-        verify(mockRecord, times(1)).ack();
-        assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
-        assertEquals(sink.getElasticsearchClient().search(index).getHits().getHits()[0].getId(), "bob");
+    @Test(dataProvider = "elasticImage")
+    public final void sendKeyIgnoreSingleField(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            final String index = "testkeyignore";
+            map.put("indexName", index);
+            map.put("keyIgnore", "true");
+            map.put("primaryFields", "name");
+            sink.open(map, mockSinkContext);
+            send(1);
+            verify(mockRecord, times(1)).ack();
+            assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
+            assertEquals(sink.getElasticsearchClient().search(index).hits().hits().get(0).id(), "bob");
+        }
     }
 
-    @Test(enabled = true)
-    public final void sendKeyIgnoreMultipleFields() throws Exception {
-        final String index = "testkeyignore2";
-        map.put("indexName", index);
-        map.put("keyIgnore", "true");
-        map.put("primaryFields", "name,userName");
-        sink.open(map, mockSinkContext);
-        send(1);
-        verify(mockRecord, times(1)).ack();
-        assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
-        assertEquals(sink.getElasticsearchClient().search(index).getHits().getHits()[0].getId(), "[\"bob\",\"boby\"]");
+    @Test(dataProvider = "elasticImage")
+    public final void sendKeyIgnoreMultipleFields(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            final String index = "testkeyignore2";
+            map.put("indexName", index);
+            map.put("keyIgnore", "true");
+            map.put("primaryFields", "name,userName");
+            sink.open(map, mockSinkContext);
+            send(1);
+            verify(mockRecord, times(1)).ack();
+            assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
+            assertEquals(sink.getElasticsearchClient().search(index).hits().hits().get(0).id(), "[\"bob\",\"boby\"]");
+        }
     }
 
     protected final void send(int numRecords) throws Exception {
@@ -221,51 +219,61 @@ public class ElasticSearchSinkTests extends ElasticSearchTestBase {
         }
     }
 
-    @Test(enabled = true)
-    public void testStripNullNodes() throws Exception {
-        map.put("stripNulls", true);
-        sink.open(map, mockSinkContext);
-        GenericRecord genericRecord = genericSchema.newRecordBuilder()
-                .set("name", null)
-                .set("userName", "boby")
-                .set("email", null)
-                .build();
-        String json = sink.stringifyValue(valueSchema, genericRecord);
-        assertEquals(json, "{\"userName\":\"boby\"}");
+    @Test(dataProvider = "elasticImage")
+    public void testStripNullNodes(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            map.put("stripNulls", true);
+            sink.open(map, mockSinkContext);
+            GenericRecord genericRecord = genericSchema.newRecordBuilder()
+                    .set("name", null)
+                    .set("userName", "boby")
+                    .set("email", null)
+                    .build();
+            String json = sink.stringifyValue(valueSchema, genericRecord);
+            assertEquals(json, "{\"userName\":\"boby\"}");
+        }
     }
 
-    @Test(enabled = true)
-    public void testKeepNullNodes() throws Exception {
-        map.put("stripNulls", false);
-        sink.open(map, mockSinkContext);
-        GenericRecord genericRecord = genericSchema.newRecordBuilder()
-                .set("name", null)
-                .set("userName", "boby")
-                .set("email", null)
-                .build();
-        String json = sink.stringifyValue(valueSchema, genericRecord);
-        assertEquals(json, "{\"name\":null,\"userName\":\"boby\",\"email\":null}");
+    @Test(dataProvider = "elasticImage")
+    public void testKeepNullNodes(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            map.put("stripNulls", false);
+            sink.open(map, mockSinkContext);
+            GenericRecord genericRecord = genericSchema.newRecordBuilder()
+                    .set("name", null)
+                    .set("userName", "boby")
+                    .set("email", null)
+                    .build();
+            String json = sink.stringifyValue(valueSchema, genericRecord);
+            assertEquals(json, "{\"name\":null,\"userName\":\"boby\",\"email\":null}");
+        }
     }
 
-    @Test(enabled = true, expectedExceptions = PulsarClientException.InvalidMessageException.class)
-    public void testNullValueFailure() throws Exception {
-        String index = "testnullvaluefail";
-        map.put("indexName", index);
-        map.put("keyIgnore", "false");
-        map.put("nullValueAction", "FAIL");
-        sink.open(map, mockSinkContext);
-        MockRecordNullValue mockRecordNullValue = new MockRecordNullValue();
-        sink.write(mockRecordNullValue);
+    @Test(dataProvider = "elasticImage", expectedExceptions = PulsarClientException.InvalidMessageException.class)
+    public void testNullValueFailure(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            String index = "testnullvaluefail";
+            map.put("indexName", index);
+            map.put("keyIgnore", "false");
+            map.put("nullValueAction", "FAIL");
+            sink.open(map, mockSinkContext);
+            MockRecordNullValue mockRecordNullValue = new MockRecordNullValue();
+            sink.write(mockRecordNullValue);
+        }
     }
 
-    @Test(enabled = true)
-    public void testNullValueIgnore() throws Exception {
-        testNullValue(ElasticSearchConfig.NullValueAction.IGNORE);
+    @Test(dataProvider = "elasticImage")
+    public void testNullValueIgnore(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            testNullValue(ElasticSearchConfig.NullValueAction.IGNORE);
+        }
     }
 
-    @Test(enabled = true)
-    public void testNullValueDelete() throws Exception {
-        testNullValue(ElasticSearchConfig.NullValueAction.DELETE);
+    @Test(dataProvider = "elasticImage")
+    public void testNullValueDelete(String image) throws Exception {
+        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
+            testNullValue(ElasticSearchConfig.NullValueAction.DELETE);
+        }
     }
 
     public void testNullValue(ElasticSearchConfig.NullValueAction action) throws Exception {
@@ -306,5 +314,12 @@ public class ElasticSearchSinkTests extends ElasticSearchTestBase {
         sink.write(new MockRecordNullValue());
         assertEquals(sink.getElasticsearchClient().totalHits(index), action.equals(ElasticSearchConfig.NullValueAction.DELETE) ? 0L : 1L);
         assertNull(sink.getElasticsearchClient().irrecoverableError.get());
+    }
+
+    @Override
+    protected ElasticsearchContainer startElasticsearchContainer(String image) {
+        final ElasticsearchContainer container = super.startElasticsearchContainer(image);
+        map.put("elasticSearchUrl", "http://"+container.getHttpHostAddress());
+        return container;
     }
 }

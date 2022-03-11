@@ -18,8 +18,31 @@
  */
 package org.apache.pulsar.io.elasticsearch;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.ErrorCause;
+import co.elastic.clients.elasticsearch._types.Result;
+import co.elastic.clients.elasticsearch.core.BulkRequest;
+import co.elastic.clients.elasticsearch.core.BulkResponse;
+import co.elastic.clients.elasticsearch.core.DeleteRequest;
+import co.elastic.clients.elasticsearch.core.DeleteResponse;
+import co.elastic.clients.elasticsearch.core.IndexRequest;
+import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
+import co.elastic.clients.elasticsearch.core.bulk.BulkOperationBuilders;
+import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
+import co.elastic.clients.elasticsearch.core.bulk.DeleteOperation;
+import co.elastic.clients.elasticsearch.core.bulk.IndexOperation;
+import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.indices.DeleteIndexResponse;
+import co.elastic.clients.elasticsearch.indices.ExistsRequest;
+import co.elastic.clients.elasticsearch.core.IndexResponse;
+import co.elastic.clients.elasticsearch.indices.IndexSettings;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,38 +69,9 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.pulsar.client.api.schema.GenericObject;
 import org.apache.pulsar.functions.api.Record;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.DocWriteResponse;
-import org.opensearch.action.admin.indices.create.CreateIndexRequest;
-import org.opensearch.action.admin.indices.create.CreateIndexResponse;
-import org.opensearch.action.admin.indices.delete.DeleteIndexRequest;
-import org.opensearch.action.admin.indices.refresh.RefreshRequest;
-import org.opensearch.action.bulk.BulkItemResponse;
-import org.opensearch.action.bulk.BulkProcessor;
-import org.opensearch.action.bulk.BulkRequest;
-import org.opensearch.action.bulk.BulkResponse;
-import org.opensearch.action.delete.DeleteRequest;
-import org.opensearch.action.delete.DeleteResponse;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.action.index.IndexResponse;
-import org.opensearch.action.search.SearchRequest;
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.action.support.master.AcknowledgedResponse;
-import org.opensearch.client.Node;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.Requests;
-import org.opensearch.client.RestClient;
-import org.opensearch.client.RestClientBuilder;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.client.indices.GetIndexRequest;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.common.unit.ByteSizeUnit;
-import org.opensearch.common.unit.ByteSizeValue;
-import org.opensearch.common.unit.TimeValue;
-import org.opensearch.common.xcontent.XContentType;
-import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.client.Node;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -93,6 +87,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
@@ -106,75 +101,23 @@ public class ElasticSearchClient implements AutoCloseable {
 
     private ElasticSearchConfig config;
     private ConfigCallback configCallback;
-    private RestHighLevelClient client;
+    private ElasticsearchClient javaClient;
 
     final Set<String> indexCache = new HashSet<>();
     final Map<String, String> topicToIndexCache = new HashMap<>();
 
     final RandomExponentialRetry backoffRetry;
     final BulkProcessor bulkProcessor;
-    final ConcurrentMap<DocWriteRequest<?>, Record> records = new ConcurrentHashMap<>();
+    final ConcurrentMap<Long, Record> records = new ConcurrentHashMap<>();
     final AtomicReference<Exception> irrecoverableError = new AtomicReference<>();
     final ScheduledExecutorService executorService;
+    final AtomicLong bulkOperationIdGenerator = new AtomicLong();
+    final ObjectMapper objectMapper = new ObjectMapper();
 
     ElasticSearchClient(ElasticSearchConfig elasticSearchConfig) throws MalformedURLException {
         this.config = elasticSearchConfig;
         this.configCallback = new ConfigCallback();
         this.backoffRetry = new RandomExponentialRetry(elasticSearchConfig.getMaxRetryTimeInSec());
-        if (config.isBulkEnabled() == false) {
-            bulkProcessor = null;
-        } else {
-            BulkProcessor.Builder builder = BulkProcessor.builder(
-                    (bulkRequest, bulkResponseActionListener) -> client.bulkAsync(bulkRequest, RequestOptions.DEFAULT, bulkResponseActionListener),
-                    new BulkProcessor.Listener() {
-                        @Override
-                        public void beforeBulk(long l, BulkRequest bulkRequest) {
-                        }
-
-                        @Override
-                        public void afterBulk(long l, BulkRequest bulkRequest, BulkResponse bulkResponse) {
-                            log.trace("Bulk request id={} size={}:", l, bulkRequest.requests().size());
-                            for (int i = 0; i < bulkResponse.getItems().length; i++) {
-                                DocWriteRequest<?> request = bulkRequest.requests().get(i);
-                                Record record = records.get(request);
-                                BulkItemResponse bulkItemResponse = bulkResponse.getItems()[i];
-                                if (bulkItemResponse.isFailed()) {
-                                    record.fail();
-                                    try {
-                                        hasIrrecoverableError(bulkItemResponse);
-                                    } catch(Exception e) {
-                                        log.warn("Unrecoverable error:", e);
-                                    }
-                                } else {
-                                    record.ack();
-                                }
-                                records.remove(request);
-                            }
-                        }
-
-                        @Override
-                        public void afterBulk(long l, BulkRequest bulkRequest, Throwable throwable) {
-                            log.warn("Bulk request id={} failed:", l, throwable);
-                            for (DocWriteRequest<?> request : bulkRequest.requests()) {
-                                Record record = records.remove(request);
-                                record.fail();
-                            }
-                        }
-                    }
-            )
-                    .setBulkActions(config.getBulkActions())
-                    .setBulkSize(new ByteSizeValue(config.getBulkSizeInMb(), ByteSizeUnit.MB))
-                    .setConcurrentRequests(config.getBulkConcurrentRequests())
-                    .setBackoffPolicy(new RandomExponentialBackoffPolicy(backoffRetry,
-                            config.getRetryBackoffInMs(),
-                            config.getMaxRetries()
-                    ));
-            if (config.getBulkFlushIntervalInMs() > 0) {
-                builder.setFlushInterval(new TimeValue(config.getBulkFlushIntervalInMs(), TimeUnit.MILLISECONDS));
-            }
-            this.bulkProcessor = builder.build();
-        }
-
         // idle+expired connection evictor thread
         this.executorService = Executors.newSingleThreadScheduledExecutor();
         this.executorService.scheduleAtFixedRate(new Runnable() {
@@ -193,7 +136,7 @@ public class ElasticSearchClient implements AutoCloseable {
         URL url = new URL(config.getElasticSearchUrl());
         log.info("ElasticSearch URL {}", url);
         RestClientBuilder builder = RestClient.builder(new HttpHost(url.getHost(), url.getPort(), url.getProtocol()))
-                .setRequestConfigCallback(new RestClientBuilder.RequestConfigCallback() {
+                .setRequestConfigCallback(new org.elasticsearch.client.RestClientBuilder.RequestConfigCallback() {
                     @Override
                     public RequestConfig.Builder customizeRequestConfig(RequestConfig.Builder builder) {
                         return builder
@@ -209,10 +152,55 @@ public class ElasticSearchClient implements AutoCloseable {
                         log.warn("Node host={} failed", node.getHost());
                     }
                 });
-        this.client = new RestHighLevelClient(builder);
+        ElasticsearchTransport transport = new RestClientTransport(builder.build(),
+                new JacksonJsonpMapper());
+        this.javaClient = new ElasticsearchClient(transport);
+
+        if (config.isBulkEnabled() == false) {
+            bulkProcessor = null;
+        } else {
+            bulkProcessor = new BulkProcessor(elasticSearchConfig, javaClient, new BulkProcessor.Listener() {
+
+                private Record removeAndGetRecordForOperation(BulkOperation operation) {
+                    final BulkProcessor.BulkOperationWithId bulkOperation =
+                            (BulkProcessor.BulkOperationWithId) operation;
+                    return records.remove(bulkOperation.getOperationId());
+
+                }
+                @Override
+                public void beforeBulk(long executionId, BulkRequest bulkRequest) {
+                }
+
+                @Override
+                public void afterBulk(long executionId, BulkRequest bulkRequest, BulkResponse bulkResponse) {
+                    log.trace("Bulk request id={} size={}:", executionId, bulkRequest.operations().size());
+                    int index = 0;
+                    for (BulkResponseItem item: bulkResponse.items()) {
+                        final Record record = removeAndGetRecordForOperation(bulkRequest.operations().get(index++));
+                        if (item.error() != null) {
+                            record.fail();
+                            checkForIrrecoverableError(item);
+                        } else {
+                            record.ack();
+                        }
+                    }
+                }
+
+                @Override
+                public void afterBulk(long executionId, BulkRequest bulkRequest, Throwable throwable) {
+                    log.warn("Bulk request id={} failed:", executionId, throwable);
+                    for (BulkOperation operation: bulkRequest.operations()) {
+                        final Record record = removeAndGetRecordForOperation(operation);
+                        record.fail();
+                    }
+                }
+            });
+
+        }
+
     }
 
-    void failed(Exception e) throws Exception {
+    void failed(Exception e) {
         if (irrecoverableError.compareAndSet(null, e)) {
             log.error("Irrecoverable error:", e);
         }
@@ -222,24 +210,28 @@ public class ElasticSearchClient implements AutoCloseable {
         return irrecoverableError.get() != null;
     }
 
-    void hasIrrecoverableError(BulkItemResponse bulkItemResponse) throws Exception {
+    void checkForIrrecoverableError(BulkResponseItem bulkItemResponse) {
+        final ErrorCause errorCause = bulkItemResponse.error();
+        if (errorCause == null) {
+            return;
+        }
         for (String error : malformedErrors) {
-            if (bulkItemResponse.getFailureMessage().contains(error)) {
+            if (errorCause.type().contains(error)) {
                 switch (config.getMalformedDocAction()) {
                     case IGNORE:
                         break;
                     case WARN:
                         log.warn("Ignoring malformed document index={} id={}",
-                                bulkItemResponse.getIndex(),
-                                bulkItemResponse.getId(),
-                                bulkItemResponse.getFailure().getCause());
+                                bulkItemResponse.index(),
+                                bulkItemResponse.id(),
+                                errorCause.type());
                         break;
                     case FAIL:
                         log.error("Failure due to the malformed document index={} id={}",
-                                bulkItemResponse.getIndex(),
-                                bulkItemResponse.getId(),
-                                bulkItemResponse.getFailure().getCause());
-                        failed(bulkItemResponse.getFailure().getCause());
+                                bulkItemResponse.index(),
+                                bulkItemResponse.id(),
+                                errorCause.type());
+                        failed(new Exception(errorCause.type()));
                         break;
                 }
             }
@@ -250,14 +242,26 @@ public class ElasticSearchClient implements AutoCloseable {
         try {
             checkNotFailed();
             checkIndexExists(record.getTopicName());
-            IndexRequest indexRequest = Requests.indexRequest(config.getIndexName());
-            if (!Strings.isNullOrEmpty(idAndDoc.getLeft()))
-                indexRequest.id(idAndDoc.getLeft());
-            indexRequest.type(config.getTypeName());
-            indexRequest.source(idAndDoc.getRight(), XContentType.JSON);
+            final String documentId = idAndDoc.getLeft();
+            final String documentSource = idAndDoc.getRight();
 
-            records.put(indexRequest, record);
-            bulkProcessor.add(indexRequest);
+            final Map mapped = objectMapper.readValue(documentSource, Map.class);
+
+            final IndexOperation<Map> indexOperation = new IndexOperation.Builder<Map>()
+                    .index(config.getIndexName())
+                    .id(documentId)
+                    .document(mapped)
+                    .build();
+
+            final long operationId = bulkOperationIdGenerator.incrementAndGet();
+            records.put(operationId, record);
+
+            long sourceLength = 0;
+            if (config.getBulkSizeInMb() > 0) {
+                sourceLength = documentSource.getBytes(StandardCharsets.UTF_8).length;
+            }
+            bulkProcessor.add(BulkProcessor.BulkOperationWithId.indexOperation(indexOperation,
+                    operationId, sourceLength));
         } catch(Exception e) {
             log.debug("index failed id=" + idAndDoc.getLeft(), e);
             record.fail();
@@ -276,18 +280,21 @@ public class ElasticSearchClient implements AutoCloseable {
      * @return
      * @throws Exception
      */
+    @SneakyThrows
     public boolean indexDocument(Record<GenericObject> record, Pair<String, String> idAndDoc) throws Exception {
         try {
             checkNotFailed();
             checkIndexExists(record.getTopicName());
-            IndexRequest indexRequest = Requests.indexRequest(config.getIndexName());
-            if (!Strings.isNullOrEmpty(idAndDoc.getLeft()))
-                indexRequest.id(idAndDoc.getLeft());
-            indexRequest.type(config.getTypeName());
-            indexRequest.source(idAndDoc.getRight(), XContentType.JSON);
-            IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-            if (indexResponse.getResult().equals(DocWriteResponse.Result.CREATED) ||
-                    indexResponse.getResult().equals(DocWriteResponse.Result.UPDATED)) {
+
+            final Map mapped = objectMapper.readValue(idAndDoc.getRight(), Map.class);
+            final IndexRequest<Object> indexRequest = new IndexRequest.Builder<>()
+                    .index(config.getIndexName())
+                    .document(mapped)
+                    .id(idAndDoc.getLeft())
+                    .build();
+            final IndexResponse index = javaClient.index(indexRequest);
+
+            if (index.result().equals(Result.Created) || index.result().equals(Result.Updated)) {
                 record.ack();
                 return true;
             } else {
@@ -305,12 +312,15 @@ public class ElasticSearchClient implements AutoCloseable {
         try {
             checkNotFailed();
             checkIndexExists(record.getTopicName());
-            DeleteRequest deleteRequest = Requests.deleteRequest(config.getIndexName());
-            deleteRequest.id(id);
-            deleteRequest.type(config.getTypeName());
 
-            records.put(deleteRequest, record);
-            bulkProcessor.add(deleteRequest);
+            final DeleteOperation deleteOperation = new DeleteOperation.Builder()
+                    .index(config.getIndexName())
+                    .id(id)
+                    .build();
+
+            final long operationId = bulkOperationIdGenerator.incrementAndGet();
+            records.put(operationId, record);
+            bulkProcessor.add(BulkProcessor.BulkOperationWithId.deleteOperation(deleteOperation, operationId));
         } catch(Exception e) {
             log.debug("delete failed id=" + id, e);
             record.fail();
@@ -333,10 +343,24 @@ public class ElasticSearchClient implements AutoCloseable {
         try {
             checkNotFailed();
             checkIndexExists(record.getTopicName());
-            DeleteRequest deleteRequest = Requests.deleteRequest(config.getIndexName());
-            deleteRequest.id(id);
-            deleteRequest.type(config.getTypeName());
-            DeleteResponse deleteResponse = client.delete(deleteRequest, RequestOptions.DEFAULT);
+
+
+            final DeleteRequest req = new
+                    DeleteRequest.Builder()
+                    .index(config.getIndexName())
+                    .id(id)
+                    .build();
+
+            DeleteResponse index = javaClient.delete(req);
+            if (index.result().equals(Result.Deleted) || index.result().equals(Result.NotFound)) {
+                record.ack();
+                return true;
+            } else {
+                record.fail();
+                return false;
+            }
+/*
+
             log.debug("delete result=" + deleteResponse.getResult());
             if (deleteResponse.getResult().equals(DocWriteResponse.Result.DELETED) ||
                     deleteResponse.getResult().equals(DocWriteResponse.Result.NOT_FOUND)) {
@@ -344,7 +368,7 @@ public class ElasticSearchClient implements AutoCloseable {
                 return true;
             }
             record.fail();
-            return false;
+            return false;*/
         } catch (final Exception ex) {
             log.debug("index failed id=" + id, ex);
             record.fail();
@@ -368,13 +392,9 @@ public class ElasticSearchClient implements AutoCloseable {
         } catch (InterruptedException e) {
             log.warn("Elasticsearch bulk processor close error:", e);
         }
-        try {
-            this.executorService.shutdown();
-            if (this.client != null) {
-                this.client.close();
-            }
-        } catch (IOException e) {
-            log.warn("Elasticsearch client close error:", e);
+        this.executorService.shutdown();
+        if (this.javaClient != null) {
+            this.javaClient.shutdown();
         }
     }
 
@@ -441,57 +461,60 @@ public class ElasticSearchClient implements AutoCloseable {
         if (indexExists(indexName)) {
             return false;
         }
-        final CreateIndexRequest cireq = new CreateIndexRequest(indexName);
-        cireq.settings(Settings.builder()
-                .put("index.number_of_shards", config.getIndexNumberOfShards())
-                .put("index.number_of_replicas", config.getIndexNumberOfReplicas()));
+        final co.elastic.clients.elasticsearch.indices.CreateIndexRequest createIndexRequest = new co.elastic.clients.elasticsearch.indices.CreateIndexRequest.Builder()
+                .index(indexName)
+                .settings(new IndexSettings.Builder()
+                        .numberOfShards(config.getIndexNumberOfShards() + "")
+                        .numberOfReplicas(config.getIndexNumberOfReplicas() + "")
+                        .build()
+                )
+                .build();
         return retry(() -> {
-            CreateIndexResponse resp = client.indices().create(cireq, RequestOptions.DEFAULT);
-            if (!resp.isAcknowledged() || !resp.isShardsAcknowledged()) {
-                throw new IOException("Unable to create index.");
+            final co.elastic.clients.elasticsearch.indices.CreateIndexResponse createIndexResponse = javaClient.indices().create(createIndexRequest);
+            if ((createIndexResponse.acknowledged() != null && createIndexResponse.acknowledged())|| createIndexResponse.shardsAcknowledged()) {
+                return true;
             }
-            return true;
+            throw new IOException("Unable to create index.");
         }, "create index");
     }
 
     public boolean indexExists(final String indexName) throws IOException {
-        final GetIndexRequest request = new GetIndexRequest(indexName);
-        return retry(() -> client.indices().exists(request, RequestOptions.DEFAULT), "index exists");
+        final ExistsRequest request = new ExistsRequest.Builder()
+                .index(indexName)
+                .build();
+        return retry(() -> javaClient.indices().exists(request).value(), "index exists");
     }
 
     @VisibleForTesting
     protected long totalHits(String indexName) throws IOException {
-        client.indices().refresh(new RefreshRequest(indexName), RequestOptions.DEFAULT);
-        SearchResponse response =  client.search(
-                new SearchRequest()
-                        .indices(indexName)
-                        .source(new SearchSourceBuilder().query(QueryBuilders.matchAllQuery())),
-                RequestOptions.DEFAULT);
-        for(SearchHit searchHit : response.getHits()) {
-            System.out.println(searchHit.getId()+": "+searchHit.getFields());
+        final co.elastic.clients.elasticsearch.core.SearchResponse<Map> searchResponse = search(indexName);
+
+        for(Hit<Map> hit: searchResponse.hits().hits()) {
+            System.out.println(hit.id() + ": " + hit.fields());
         }
-        return response.getHits().getTotalHits().value;
+        return searchResponse.hits().total().value();
     }
 
     @VisibleForTesting
-    protected SearchResponse search(String indexName) throws IOException {
-        client.indices().refresh(new RefreshRequest(indexName), RequestOptions.DEFAULT);
-        return client.search(
-                new SearchRequest()
-                        .indices(indexName)
-                        .source(new SearchSourceBuilder().query(QueryBuilders.matchAllQuery())),
-                RequestOptions.DEFAULT);
+    protected co.elastic.clients.elasticsearch.core.SearchResponse<Map> search(String indexName) throws IOException {
+        final co.elastic.clients.elasticsearch.indices.RefreshRequest refreshRequest = new co.elastic.clients.elasticsearch.indices.RefreshRequest.Builder().index(indexName).build();
+        javaClient.indices().refresh(refreshRequest);
+
+        return javaClient.search(new co.elastic.clients.elasticsearch.core.SearchRequest.Builder().index(indexName)
+                .q("*:*")
+                .build(), Map.class);
     }
 
     @VisibleForTesting
-    protected AcknowledgedResponse delete(String indexName) throws IOException {
-        return client.indices().delete(new DeleteIndexRequest(indexName), RequestOptions.DEFAULT);
+    protected DeleteIndexResponse delete(String indexName) throws IOException {
+        return javaClient.indices().delete(new co.elastic.clients.elasticsearch.indices.DeleteIndexRequest.Builder().index(indexName).build());
     }
 
     private <T> T retry(Callable<T> callable, String source) {
         try {
             return backoffRetry.retry(callable, config.getMaxRetries(), config.getRetryBackoffInMs(), source);
         } catch (Exception e) {
+            e.printStackTrace();
             log.error("error in command {} wth retry", source, e);
             throw new ElasticSearchConnectionException(source + " failed", e);
         }

@@ -18,42 +18,84 @@
  */
 package org.apache.pulsar.io.elasticsearch;
 
-import com.google.common.collect.ImmutableMap;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pulsar.client.api.schema.GenericObject;
-import org.apache.pulsar.common.schema.SchemaType;
-import org.apache.pulsar.functions.api.Record;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch.core.BulkResponse;
+import co.elastic.clients.elasticsearch.core.IndexRequest;
+import co.elastic.clients.elasticsearch.core.IndexResponse;
+import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
+import co.elastic.clients.elasticsearch.core.bulk.IndexOperation;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.Transport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.SneakyThrows;
+import org.apache.http.HttpHost;
+import org.elasticsearch.client.RestClient;
+import org.opensearch.action.bulk.BulkProcessor;
+import org.opensearch.client.json.ToJsonp;
+import org.opensearch.client.opensearch._global.BulkRequest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import java.nio.charset.StandardCharsets;
-
-import static org.testng.Assert.assertEquals;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public class ElasticSearchBWCTests {
 
-    @Test
-    public void testGenericRecord() throws Exception {
-        String json = "{\"c\":\"1\",\"d\":1,\"e\":{\"a\":\"a\",\"b\":true,\"d\":1.0,\"f\":1.0,\"i\":1,\"l\":10}}";
+    public final static String INDEX = "myindex" + UUID.randomUUID().toString();
 
-        ElasticSearchSink elasticSearchSink = new ElasticSearchSink();
-        elasticSearchSink.open(ImmutableMap.of("elasticSearchUrl", "http://localhost:9200", "schemaEnable", "true"), null);
-        Pair<String, String> pair = elasticSearchSink.extractIdAndDocument(new Record<GenericObject>() {
-            @Override
-            public GenericObject getValue() {
-                return new GenericObject() {
-                    @Override
-                    public SchemaType getSchemaType() {
-                        return SchemaType.BYTES;
-                    }
+    static ElasticSearchConfig config;
+    static ElasticSearchClient client;
 
-                    @Override
-                    public Object getNativeObject() {
-                        return json.getBytes(StandardCharsets.UTF_8);
-                    }
-                };
-            }
-        });
-        assertEquals(pair.getLeft(), null);
-        assertEquals(pair.getRight(), json);
+    @BeforeClass
+    public static final void initBeforeClass() throws IOException {
+        config = new ElasticSearchConfig();
+        config.setElasticSearchUrl("http://localhost:9200");
+        // config.setElasticSearchUrl("http://localhost:9200");
+        config.setIndexName(INDEX);
+        client = new ElasticSearchClient(config);
     }
+
+
+
+    @Test
+
+    public void testIndexDelete() throws Exception {
+
+        client.createIndexIfNeeded(INDEX);
+        RestClient restClient = null;
+
+        //Initialize the client with SSL and TLS enabled
+        restClient = RestClient.builder(new HttpHost("localhost", 9200, "http")).build();
+        ElasticsearchTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());
+        final ElasticsearchClient elasticsearchClient = new ElasticsearchClient(transport);
+
+        final Map mapped = new HashMap();
+        mapped.put("hello", "you");
+        final co.elastic.clients.elasticsearch.core.BulkRequest bulkRequest1 = new co.elastic.clients.elasticsearch.core.BulkRequest.Builder()
+                .operations(new BulkOperation
+                        .Builder()
+                        .index(
+                                new IndexOperation.Builder<>()
+                                        .index(INDEX).id("1").document(mapped).build()
+                        )
+                        .build())
+                .build();
+
+        final BulkResponse respon = elasticsearchClient.bulk(bulkRequest1);
+        System.out.println(respon);
+
+        final co.elastic.clients.elasticsearch.core.IndexRequest<Object> indexRequest = new co.elastic.clients.elasticsearch.core.IndexRequest.Builder<>().index(config.getIndexName())
+                .document(mapped)
+                .id("1")
+                .build();
+        final IndexResponse index = elasticsearchClient.index(indexRequest);
+
+    }
+
 }

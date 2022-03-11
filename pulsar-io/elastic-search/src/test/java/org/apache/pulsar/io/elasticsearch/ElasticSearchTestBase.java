@@ -18,19 +18,47 @@
  */
 package org.apache.pulsar.io.elasticsearch;
 
+import lombok.SneakyThrows;
+import org.testcontainers.containers.Network;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
+import org.testng.annotations.DataProvider;
 
 import java.util.Optional;
 
 public class ElasticSearchTestBase {
 
-    private static final String ELASTICSEARCH_IMAGE = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE"))
+    private static final String ELASTICSEARCH_8 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE"))
+            .orElse("docker.elastic.co/elasticsearch/elasticsearch:8.1.0");
+
+    private static final String ELASTICSEARCH_7 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE"))
             .orElse("docker.elastic.co/elasticsearch/elasticsearch:7.16.3-amd64");
 
-    protected static ElasticsearchContainer createElasticsearchContainer() {
-        return new ElasticsearchContainer(ELASTICSEARCH_IMAGE)
-                .withEnv("ES_JAVA_OPTS", "-Xms128m -Xmx256m");
+    @DataProvider(name = "elasticImage")
+    public Object[][] elasticContainerProvider() {
+        return new Object[][] { { ELASTICSEARCH_7 }, { ELASTICSEARCH_8 } };
+    }
 
+    protected ElasticsearchContainer createElasticsearchContainer(String image) {
+        return new ElasticsearchContainer(image)
+                .withEnv("ES_JAVA_OPTS", "-Xms128m -Xmx256m")
+                .withEnv("xpack.security.enabled", "false")
+                .withEnv("xpack.security.http.ssl.enabled", "false");
+
+    }
+
+    protected ElasticsearchContainer startElasticsearchContainer(String image) {
+        return startElasticsearchContainer(image, null);
+    }
+    protected ElasticsearchContainer startElasticsearchContainer(String image, Network network) {
+        final ElasticsearchContainer container = new ElasticsearchContainer(image)
+                .withEnv("ES_JAVA_OPTS", "-Xms128m -Xmx256m")
+                .withEnv("xpack.security.enabled", "false")
+                .withEnv("xpack.security.http.ssl.enabled", "false");
+        if (network != null) {
+            container.withNetwork(network);
+        }
+        container.start();
+        return container;
     }
 
 }
