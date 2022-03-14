@@ -70,7 +70,8 @@ public class RandomExponentialRetry {
             } catch (Exception e) {
                 lastException = e;
                 long backoff = randomWaitInMs(i, initialBackoff);
-                log.info("Trying source={} attempt {}/{} failed, waiting {}ms", source, i, maxAttempts, backoff);
+                log.info("Executing '{}', attempt {}/{}, next retry in {} ms, caused by: {}", source, i,
+                        maxAttempts, backoff, e.getMessage());
                 clock.sleep(backoff);
             }
         }

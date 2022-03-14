@@ -138,8 +138,8 @@ public class BulkProcessor implements Closeable {
     }
 
     public void add(BulkOperationWithId bulkOperation) {
-        ensureOpen();
         lock.lock();
+        ensureOpen();
         try {
             this.pendingOperations.add(bulkOperation);
         } finally {
@@ -154,7 +154,6 @@ public class BulkProcessor implements Closeable {
         } catch (InterruptedException var2) {
             Thread.currentThread().interrupt();
         }
-
     }
 
     public void awaitClose(long timeout, TimeUnit unit) throws InterruptedException {
@@ -249,6 +248,7 @@ public class BulkProcessor implements Closeable {
             try {
                 this.semaphore.acquire();
             } catch (InterruptedException ex) {
+                this.semaphore.release();
                 Thread.currentThread().interrupt();
                 listener.afterBulk(executionId, bulkRequest, ex);
                 return;
@@ -266,7 +266,6 @@ public class BulkProcessor implements Closeable {
                     log.debug("Sending bulk {} completed", executionId);
                     promise.complete(bulkResponse);
                 } catch (Throwable ex) {
-                    ex.printStackTrace();
                     promise.completeExceptionally(ex);
                     log.warn("Failed to execute bulk request " + executionId, ex);
                     listener.afterBulk(executionId, bulkRequest, ex);
