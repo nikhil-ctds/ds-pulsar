@@ -45,7 +45,13 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
-public class ElasticSearchSinkRawDataTests extends ElasticSearchTestBase {
+public abstract class ElasticSearchSinkRawDataTests extends ElasticSearchTestBase {
+
+    private static ElasticsearchContainer container;
+
+    public ElasticSearchSinkRawDataTests(String elasticImageName) {
+        super(elasticImageName);
+    }
 
     @Mock
     protected Record<GenericObject> mockRecord;
@@ -60,15 +66,27 @@ public class ElasticSearchSinkRawDataTests extends ElasticSearchTestBase {
 
     static Schema<byte[]> schema;
 
-    @BeforeClass
-    public static final void initBeforeClass() {
+    @BeforeMethod(alwaysRun = true)
+    public final void initBeforeClass() {
+        if (container != null) {
+            return;
+        }
+        container = createElasticsearchContainer();
         schema = Schema.BYTES;
+    }
+
+    @AfterClass(alwaysRun = true)
+    public static void closeAfterClass() {
+        container.close();
     }
 
     @SuppressWarnings("unchecked")
     @BeforeMethod
     public final void setUp() throws Exception {
+        container.start();
+
         map = new HashMap<String, Object> ();
+        map.put("elasticSearchUrl", "http://"+container.getHttpHostAddress());
         map.put("schemaEnable", "false");
         sink = new ElasticSearchSink();
 
@@ -103,18 +121,16 @@ public class ElasticSearchSinkRawDataTests extends ElasticSearchTestBase {
             sink.close();
     }
 
-    @Test(dataProvider = "elasticImage")
-    public final void singleNonSchemaAwareTest(String image) throws Exception {
-        try (ElasticsearchContainer container = startElasticsearchContainer(image)) {
-            map.put("indexName", "test-index");
-            sink.open(map, mockSinkContext);
-            send(10);
-            verify(mockRecord, times(10)).ack();
-            verify(mockMessage, times(10)).getData();
-            verify(mockMessage, times(0)).getValue();
-            verify(mockRecord, times(0)).getValue();
-            verify(mockRecord, times(0)).getKey();
-        }
+    @Test(enabled = true)
+    public final void singleNonSchemaAwareTest() throws Exception {
+        map.put("indexName", "test-index");
+        sink.open(map, mockSinkContext);
+        send(10);
+        verify(mockRecord, times(10)).ack();
+        verify(mockMessage, times(10)).getData();
+        verify(mockMessage, times(0)).getValue();
+        verify(mockRecord, times(0)).getValue();
+        verify(mockRecord, times(0)).getKey();
     }
 
     protected final void send(int numRecords) throws Exception {
@@ -122,14 +138,5 @@ public class ElasticSearchSinkRawDataTests extends ElasticSearchTestBase {
             sink.write(mockRecord);
         }
     }
-
-
-    @Override
-    protected ElasticsearchContainer startElasticsearchContainer(String image) {
-        final ElasticsearchContainer container = super.startElasticsearchContainer(image);
-        map.put("elasticSearchUrl", "http://"+container.getHttpHostAddress());
-        return container;
-    }
-
 
 }

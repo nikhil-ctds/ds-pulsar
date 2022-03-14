@@ -52,7 +52,6 @@ public class BulkProcessor implements Closeable {
     private final int bulkActions;
     private final long bulkSize;
     private final List<BulkOperationWithId> pendingOperations = new ArrayList<>();
-    private BulkRequest bulkRequest;
     private final BulkRequestHandler bulkRequestHandler;
     private volatile boolean closed = false;
     private final ReentrantLock lock;
@@ -77,9 +76,7 @@ public class BulkProcessor implements Closeable {
                     config.getBulkFlushIntervalInMs(),
                     config.getBulkFlushIntervalInMs(),
                     TimeUnit.MILLISECONDS);
-
         }
-
     }
 
     protected void ensureOpen() {
@@ -96,95 +93,84 @@ public class BulkProcessor implements Closeable {
         return bulkRequest;
     }
 
-    private void execute() {
-        this.bulkRequest = createBulkRequestAndResetPendingOps();
-        long executionId = this.executionIdGen.incrementAndGet();
+    private void execute(boolean force) {
+        long executionId;
+        BulkRequest bulkRequest;
+        lock.lock();
+        try {
+            ensureOpen();
+            if (pendingOperations.isEmpty()) {
+                return;
+            }
+            if (!force && !isOverTheLimit()) {
+                return;
+            }
+            bulkRequest = createBulkRequestAndResetPendingOps();
+            executionId = executionIdGen.incrementAndGet();
+        } finally {
+            lock.unlock();
+        }
         this.execute(bulkRequest, executionId);
     }
 
     private boolean isOverTheLimit() {
-        if (this.bulkActions != -1 && pendingOperations.size() >= this.bulkActions) {
+        if (pendingOperations.isEmpty()) {
+            return false;
+        }
+        if (this.bulkActions > 0 && pendingOperations.size() >= this.bulkActions) {
             return true;
         } else {
-            return this.bulkSize != -1L &&
+            return this.bulkSize > 0L &&
                     pendingOperations.stream().mapToLong(op -> op.getEstimatedSizeInBytes()).sum() >= this.bulkSize;
         }
     }
 
     public void flush() {
-        this.lock.lock();
-
-        try {
-            this.ensureOpen();
-            if (pendingOperations.size() > 0) {
-                this.execute();
-            }
-        } finally {
-            this.lock.unlock();
-        }
-
+        execute(true);
     }
 
     private void execute(BulkRequest bulkRequest, long executionId) {
         this.bulkRequestHandler.execute(bulkRequest, executionId);
     }
 
-    private Pair<BulkRequest, Long> newBulkRequestIfNeeded() {
-        this.ensureOpen();
-        if (!this.isOverTheLimit()) {
-            return null;
-        } else {
-            final BulkRequest bulkRequest = createBulkRequestAndResetPendingOps();
-            return Pair.of(bulkRequest, this.executionIdGen.incrementAndGet());
-        }
+    private void executeIfNeeded() {
+        execute(false);
     }
 
     public void add(BulkOperationWithId bulkOperation) {
-        Pair<BulkRequest, Long> bulkRequestToExecute;
-        this.lock.lock();
-
+        ensureOpen();
+        lock.lock();
         try {
-            this.ensureOpen();
             this.pendingOperations.add(bulkOperation);
-            bulkRequestToExecute = this.newBulkRequestIfNeeded();
         } finally {
-            this.lock.unlock();
+            lock.unlock();
         }
-
-        if (bulkRequestToExecute != null) {
-            execute(bulkRequestToExecute.getLeft(), bulkRequestToExecute.getRight());
-        }
+        executeIfNeeded();
     }
 
     public void close() {
         try {
-            this.awaitClose(0L, TimeUnit.NANOSECONDS);
+            awaitClose(0L, TimeUnit.NANOSECONDS);
         } catch (InterruptedException var2) {
             Thread.currentThread().interrupt();
         }
 
     }
 
-    public boolean awaitClose(long timeout, TimeUnit unit) throws InterruptedException {
-        this.lock.lock();
-
+    public void awaitClose(long timeout, TimeUnit unit) throws InterruptedException {
+        lock.lock();
         try {
             if (this.closed) {
-                return true;
+                return;
             }
-
-            this.closed = true;
-            if (this.futureFlushTask != null) {
-                this.futureFlushTask.cancel(false);
+            if (futureFlushTask != null) {
+                futureFlushTask.cancel(false);
             }
-            if (pendingOperations.size() > 0) {
-                this.execute();
-            }
-
-
-            return this.bulkRequestHandler.awaitClose(timeout, unit);
+            flush();
+            bulkRequestHandler.awaitClose(timeout, unit);
+            closed = true;
         } finally {
-            this.lock.unlock();
+            lock.unlock();
         }
     }
 
@@ -238,22 +224,9 @@ public class BulkProcessor implements Closeable {
         }
 
         public void run() {
-            BulkProcessor.this.lock.lock();
-
-            try {
-                if (BulkProcessor.this.closed) {
-                    return;
-                }
-
-                if (BulkProcessor.this.pendingOperations.size() == 0) {
-                    return;
-                }
-
-                BulkProcessor.this.execute();
-            } finally {
-                BulkProcessor.this.lock.unlock();
+            if (!closed) {
+                BulkProcessor.this.flush();
             }
-
         }
     }
 
@@ -279,8 +252,8 @@ public class BulkProcessor implements Closeable {
                 Thread.currentThread().interrupt();
                 listener.afterBulk(executionId, bulkRequest, ex);
                 return;
-
             }
+
             CompletableFuture<BulkResponse> promise = new CompletableFuture<>();
 
             Runnable responseCallable = () -> {

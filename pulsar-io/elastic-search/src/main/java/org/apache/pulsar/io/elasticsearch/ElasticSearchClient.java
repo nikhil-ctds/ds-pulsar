@@ -139,16 +139,11 @@ public class ElasticSearchClient implements AutoCloseable {
         URL url = new URL(config.getElasticSearchUrl());
         log.info("ElasticSearch URL {}", url);
         RestClientBuilder builder = RestClient.builder(new HttpHost(url.getHost(), url.getPort(), url.getProtocol()))
-                .setRequestConfigCallback(new org.elasticsearch.client.RestClientBuilder.RequestConfigCallback() {
-                    @Override
-                    public RequestConfig.Builder customizeRequestConfig(RequestConfig.Builder builder) {
-                        return builder
-                                .setContentCompressionEnabled(config.isCompressionEnabled())
-                                .setConnectionRequestTimeout(config.getConnectionRequestTimeoutInMs())
-                                .setConnectTimeout(config.getConnectTimeoutInMs())
-                                .setSocketTimeout(config.getSocketTimeoutInMs());
-                    }
-                })
+                .setRequestConfigCallback(builder1 -> builder1
+                        .setContentCompressionEnabled(config.isCompressionEnabled())
+                        .setConnectionRequestTimeout(config.getConnectionRequestTimeoutInMs())
+                        .setConnectTimeout(config.getConnectTimeoutInMs())
+                        .setSocketTimeout(config.getSocketTimeoutInMs()))
                 .setHttpClientConfigCallback(this.configCallback)
                 .setFailureListener(new RestClient.FailureListener() {
                     public void onFailure(Node node) {
