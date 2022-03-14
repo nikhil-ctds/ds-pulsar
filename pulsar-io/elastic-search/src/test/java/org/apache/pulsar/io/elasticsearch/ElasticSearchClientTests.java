@@ -157,6 +157,7 @@ public class ElasticSearchClientTests extends ElasticSearchTestBase {
     public void testTopicToIndexName() throws Exception {
         ElasticSearchConfig config = new ElasticSearchConfig();
         config.setIndexName(INDEX);
+        config.setElasticSearchUrl("http://localhost:9200");
         try (ElasticSearchClient client = new ElasticSearchClient(config)) {;
             assertEquals(client.topicToIndexName("data-ks1.table1"),"data-ks1.table1");
             assertEquals(client.topicToIndexName("persistent://public/default/testesjson"), "testesjson");

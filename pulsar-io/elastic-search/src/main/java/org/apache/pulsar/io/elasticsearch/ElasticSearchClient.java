@@ -26,16 +26,22 @@ import co.elastic.clients.elasticsearch.core.BulkResponse;
 import co.elastic.clients.elasticsearch.core.DeleteRequest;
 import co.elastic.clients.elasticsearch.core.DeleteResponse;
 import co.elastic.clients.elasticsearch.core.IndexRequest;
+import co.elastic.clients.elasticsearch.core.SearchRequest;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperationBuilders;
 import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import co.elastic.clients.elasticsearch.core.bulk.DeleteOperation;
 import co.elastic.clients.elasticsearch.core.bulk.IndexOperation;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.indices.CreateIndexRequest;
+import co.elastic.clients.elasticsearch.indices.CreateIndexResponse;
+import co.elastic.clients.elasticsearch.indices.DeleteIndexRequest;
 import co.elastic.clients.elasticsearch.indices.DeleteIndexResponse;
 import co.elastic.clients.elasticsearch.indices.ExistsRequest;
 import co.elastic.clients.elasticsearch.core.IndexResponse;
 import co.elastic.clients.elasticsearch.indices.IndexSettings;
+import co.elastic.clients.elasticsearch.indices.RefreshRequest;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.ElasticsearchTransport;
 import co.elastic.clients.transport.rest_client.RestClientTransport;
@@ -120,14 +126,11 @@ public class ElasticSearchClient implements AutoCloseable {
         this.backoffRetry = new RandomExponentialRetry(elasticSearchConfig.getMaxRetryTimeInSec());
         // idle+expired connection evictor thread
         this.executorService = Executors.newSingleThreadScheduledExecutor();
-        this.executorService.scheduleAtFixedRate(new Runnable() {
-                                                     @Override
-                                                     public void run() {
-                                                         configCallback.connectionManager.closeExpiredConnections();
-                                                         configCallback.connectionManager.closeIdleConnections(
-                                                                 config.getConnectionIdleTimeoutInMs(), TimeUnit.MILLISECONDS);
-                                                     }
-                                                 },
+        this.executorService.scheduleAtFixedRate(() -> {
+            configCallback.connectionManager.closeExpiredConnections();
+            configCallback.connectionManager.closeIdleConnections(
+                    config.getConnectionIdleTimeoutInMs(), TimeUnit.MILLISECONDS);
+        },
                 config.getConnectionIdleTimeoutInMs(),
                 config.getConnectionIdleTimeoutInMs(),
                 TimeUnit.MILLISECONDS
@@ -359,16 +362,6 @@ public class ElasticSearchClient implements AutoCloseable {
                 record.fail();
                 return false;
             }
-/*
-
-            log.debug("delete result=" + deleteResponse.getResult());
-            if (deleteResponse.getResult().equals(DocWriteResponse.Result.DELETED) ||
-                    deleteResponse.getResult().equals(DocWriteResponse.Result.NOT_FOUND)) {
-                record.ack();
-                return true;
-            }
-            record.fail();
-            return false;*/
         } catch (final Exception ex) {
             log.debug("index failed id=" + id, ex);
             record.fail();
@@ -461,7 +454,7 @@ public class ElasticSearchClient implements AutoCloseable {
         if (indexExists(indexName)) {
             return false;
         }
-        final co.elastic.clients.elasticsearch.indices.CreateIndexRequest createIndexRequest = new co.elastic.clients.elasticsearch.indices.CreateIndexRequest.Builder()
+        final CreateIndexRequest createIndexRequest = new CreateIndexRequest.Builder()
                 .index(indexName)
                 .settings(new IndexSettings.Builder()
                         .numberOfShards(config.getIndexNumberOfShards() + "")
@@ -470,8 +463,9 @@ public class ElasticSearchClient implements AutoCloseable {
                 )
                 .build();
         return retry(() -> {
-            final co.elastic.clients.elasticsearch.indices.CreateIndexResponse createIndexResponse = javaClient.indices().create(createIndexRequest);
-            if ((createIndexResponse.acknowledged() != null && createIndexResponse.acknowledged())|| createIndexResponse.shardsAcknowledged()) {
+            final CreateIndexResponse createIndexResponse = javaClient.indices().create(createIndexRequest);
+            if ((createIndexResponse.acknowledged() != null && createIndexResponse.acknowledged())
+                    && createIndexResponse.shardsAcknowledged()) {
                 return true;
             }
             throw new IOException("Unable to create index.");
@@ -487,34 +481,29 @@ public class ElasticSearchClient implements AutoCloseable {
 
     @VisibleForTesting
     protected long totalHits(String indexName) throws IOException {
-        final co.elastic.clients.elasticsearch.core.SearchResponse<Map> searchResponse = search(indexName);
-
-        for(Hit<Map> hit: searchResponse.hits().hits()) {
-            System.out.println(hit.id() + ": " + hit.fields());
-        }
+        final SearchResponse<Map> searchResponse = search(indexName);
         return searchResponse.hits().total().value();
     }
 
     @VisibleForTesting
-    protected co.elastic.clients.elasticsearch.core.SearchResponse<Map> search(String indexName) throws IOException {
-        final co.elastic.clients.elasticsearch.indices.RefreshRequest refreshRequest = new co.elastic.clients.elasticsearch.indices.RefreshRequest.Builder().index(indexName).build();
+    protected SearchResponse<Map> search(String indexName) throws IOException {
+        final RefreshRequest refreshRequest = new RefreshRequest.Builder().index(indexName).build();
         javaClient.indices().refresh(refreshRequest);
 
-        return javaClient.search(new co.elastic.clients.elasticsearch.core.SearchRequest.Builder().index(indexName)
+        return javaClient.search(new SearchRequest.Builder().index(indexName)
                 .q("*:*")
                 .build(), Map.class);
     }
 
     @VisibleForTesting
     protected DeleteIndexResponse delete(String indexName) throws IOException {
-        return javaClient.indices().delete(new co.elastic.clients.elasticsearch.indices.DeleteIndexRequest.Builder().index(indexName).build());
+        return javaClient.indices().delete(new DeleteIndexRequest.Builder().index(indexName).build());
     }
 
     private <T> T retry(Callable<T> callable, String source) {
         try {
             return backoffRetry.retry(callable, config.getMaxRetries(), config.getRetryBackoffInMs(), source);
         } catch (Exception e) {
-            e.printStackTrace();
             log.error("error in command {} wth retry", source, e);
             throw new ElasticSearchConnectionException(source + " failed", e);
         }
