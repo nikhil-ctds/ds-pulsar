@@ -248,7 +248,6 @@ public class BulkProcessor implements Closeable {
             try {
                 this.semaphore.acquire();
             } catch (InterruptedException ex) {
-                this.semaphore.release();
                 Thread.currentThread().interrupt();
                 listener.afterBulk(executionId, bulkRequest, ex);
                 return;
