@@ -19,6 +19,7 @@
 package org.apache.pulsar.io.elasticsearch;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.ErrorCause;
 import co.elastic.clients.elasticsearch._types.Result;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
@@ -458,12 +459,20 @@ public class ElasticSearchClient implements AutoCloseable {
                 )
                 .build();
         return retry(() -> {
-            final CreateIndexResponse createIndexResponse = javaClient.indices().create(createIndexRequest);
-            if ((createIndexResponse.acknowledged() != null && createIndexResponse.acknowledged())
-                    && createIndexResponse.shardsAcknowledged()) {
-                return true;
+            try {
+                final CreateIndexResponse createIndexResponse = javaClient.indices().create(createIndexRequest);
+                if ((createIndexResponse.acknowledged() != null && createIndexResponse.acknowledged())
+                        && createIndexResponse.shardsAcknowledged()) {
+                    return true;
+                }
+                throw new IOException("Unable to create index, acknowledged: " + createIndexResponse.acknowledged() +
+                        " shardsAcknowledged: " + createIndexResponse.shardsAcknowledged());
+            } catch (ElasticsearchException ex) {
+                if (ex.response().error().type().contains("resource_already_exists_exception")) {
+                    return false;
+                }
+                throw ex;
             }
-            throw new IOException("Unable to create index.");
         }, "create index");
     }
 

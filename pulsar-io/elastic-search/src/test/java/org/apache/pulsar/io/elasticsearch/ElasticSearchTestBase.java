@@ -26,10 +26,10 @@ import java.util.Optional;
 
 public abstract class ElasticSearchTestBase {
 
-    public static final String ELASTICSEARCH_8 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE"))
+    public static final String ELASTICSEARCH_8 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE_V8"))
             .orElse("docker.elastic.co/elasticsearch/elasticsearch:8.1.0");
 
-    public static final String ELASTICSEARCH_7 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE"))
+    public static final String ELASTICSEARCH_7 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE_V7"))
             .orElse("docker.elastic.co/elasticsearch/elasticsearch:7.16.3-amd64");
 
     @DataProvider(name = "elasticImage")
