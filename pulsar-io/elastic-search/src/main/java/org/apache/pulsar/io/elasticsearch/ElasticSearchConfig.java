@@ -253,6 +253,14 @@ public class ElasticSearchConfig implements Serializable {
 
     @FieldDoc(
             required = false,
+            defaultValue = "true",
+            help = "If ignoreUnsupportedFields is true, unsupported AVRO fields are nullified and AVRO logical types are decoded as known AVRO types, otherwise it fails."
+    )
+    private boolean ignoreUnsupportedFields = false;
+
+  
+    @FieldDoc(
+            required = false,
             defaultValue = "AUTO",
             help = "Specify compatibility mode with the ElasticSearch cluster. " +
                     "'AUTO' value will try to auto detect the correct compatibility mode to use. " +
