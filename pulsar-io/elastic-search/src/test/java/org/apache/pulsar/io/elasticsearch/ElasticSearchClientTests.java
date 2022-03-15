@@ -23,6 +23,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.schema.GenericObject;
 import org.apache.pulsar.functions.api.Record;
+import org.apache.pulsar.io.elasticsearch.client.elastic.ElasticSearchJavaRestClient;
+import org.apache.pulsar.io.elasticsearch.client.opensearch.OpenSearchHighLevelRestClient;
 import org.apache.pulsar.io.elasticsearch.testcontainers.ElasticToxiproxiContainer;
 import org.awaitility.Awaitility;
 import org.testcontainers.containers.Network;
@@ -71,6 +73,12 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
         config.setIndexName(INDEX);
 
         client = new ElasticSearchClient(config);
+        if (elasticImageName.equals(OPENSEARCH) || elasticImageName.equals(ELASTICSEARCH_7)) {
+            assertTrue(client.getRestClient() instanceof OpenSearchHighLevelRestClient);
+        } else {
+            assertTrue(client.getRestClient() instanceof ElasticSearchJavaRestClient);
+        }
+
     }
 
     @AfterClass(alwaysRun = true)

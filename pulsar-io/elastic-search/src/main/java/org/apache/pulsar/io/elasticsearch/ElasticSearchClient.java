@@ -98,8 +98,8 @@ public class ElasticSearchClient implements AutoCloseable {
                 }
             }
         };
-        this.client = RestClientFactory.createClient(config, bulkListener);
         this.backoffRetry = new RandomExponentialRetry(elasticSearchConfig.getMaxRetryTimeInSec());
+        this.client = retry(() -> RestClientFactory.createClient(config, bulkListener), "client creation");
     }
 
     void failed(Exception e) {
