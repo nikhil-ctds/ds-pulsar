@@ -56,7 +56,6 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -95,7 +94,8 @@ public abstract class RestClient implements Closeable {
 
     public abstract BulkProcessor getBulkProcessor();
 
-    public class ConfigCallback implements RestClientBuilder.HttpClientConfigCallback {
+    public class ConfigCallback implements RestClientBuilder.HttpClientConfigCallback,
+            org.opensearch.client.RestClientBuilder.HttpClientConfigCallback {
         final NHttpClientConnectionManager connectionManager;
         final CredentialsProvider credentialsProvider;
 

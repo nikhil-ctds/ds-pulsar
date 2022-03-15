@@ -154,6 +154,7 @@ flexible messaging model and an intuitive client API.</description>
     <mariadb-jdbc.version>2.6.0</mariadb-jdbc.version>
     <hdfs-offload-version3>3.3.1</hdfs-offload-version3>
     <json-smart.version>2.4.7</json-smart.version>
+    <opensearch.version>1.2.4</opensearch.version>
     <elasticsearch-java.version>8.1.0</elasticsearch-java.version>
     <presto.version>334</presto.version>
     <scala.binary.version>2.13</scala.binary.version>
@@ -1098,6 +1099,12 @@ flexible messaging model and an intuitive client API.</description>
         <groupId>io.opencensus</groupId>
         <artifactId>opencensus-contrib-grpc-metrics</artifactId>
         <version>${opencensus.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.opensearch.client</groupId>
+        <artifactId>opensearch-rest-high-level-client</artifactId>
+        <version>${opensearch.version}</version>
       </dependency>
 
       <dependency>

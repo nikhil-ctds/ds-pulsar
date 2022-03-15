@@ -20,6 +20,7 @@ package org.apache.pulsar.io.elasticsearch;
 
 import org.testcontainers.containers.Network;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
+import org.testcontainers.utility.DockerImageName;
 import org.testng.annotations.DataProvider;
 
 import java.util.Optional;
@@ -32,10 +33,8 @@ public abstract class ElasticSearchTestBase {
     public static final String ELASTICSEARCH_7 = Optional.ofNullable(System.getenv("ELASTICSEARCH_IMAGE_V7"))
             .orElse("docker.elastic.co/elasticsearch/elasticsearch:7.16.3-amd64");
 
-    @DataProvider(name = "elasticImage")
-    public Object[][] elasticContainerProvider() {
-        return new Object[][] { { ELASTICSEARCH_7 }, { ELASTICSEARCH_8 } };
-    }
+    public static final String OPENSEARCH = Optional.ofNullable(System.getenv("OPENSEARCH_IMAGE"))
+            .orElse("opensearchproject/opensearch:1.2.4");
 
     protected final String elasticImageName;
 
@@ -44,10 +43,16 @@ public abstract class ElasticSearchTestBase {
     }
 
     protected ElasticsearchContainer createElasticsearchContainer() {
+        if (elasticImageName.equals(OPENSEARCH)) {
+            DockerImageName dockerImageName = DockerImageName.parse(OPENSEARCH).asCompatibleSubstituteFor("docker.elastic.co/elasticsearch/elasticsearch");
+            return new ElasticsearchContainer(dockerImageName)
+                    .withEnv("OPENSEARCH_JAVA_OPTS", "-Xms128m -Xmx256m")
+                    .withEnv("bootstrap.memory_lock", "true")
+                    .withEnv("plugins.security.disabled", "true");
+        }
         return new ElasticsearchContainer(elasticImageName)
                 .withEnv("ES_JAVA_OPTS", "-Xms128m -Xmx256m")
                 .withEnv("xpack.security.enabled", "false")
                 .withEnv("xpack.security.http.ssl.enabled", "false");
-
     }
 }

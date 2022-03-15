@@ -26,6 +26,8 @@ import org.apache.pulsar.functions.api.Record;
 import org.apache.pulsar.io.elasticsearch.client.BulkProcessor;
 import org.apache.pulsar.io.elasticsearch.client.RestClient;
 import org.apache.pulsar.io.elasticsearch.client.elastic.ElasticSearchJavaRestClient;
+import org.apache.pulsar.io.elasticsearch.client.opensearch.OpenSearchHighLevelRestClient;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
@@ -62,9 +64,9 @@ public class ElasticSearchClient implements AutoCloseable {
     final AtomicReference<Exception> irrecoverableError = new AtomicReference<>();
     final AtomicLong bulkOperationIdGenerator = new AtomicLong();
 
-    ElasticSearchClient(ElasticSearchConfig elasticSearchConfig) throws MalformedURLException {
+    public ElasticSearchClient(ElasticSearchConfig elasticSearchConfig) throws MalformedURLException {
         this.config = elasticSearchConfig;
-        this.client = new ElasticSearchJavaRestClient(config, new org.apache.pulsar.io.elasticsearch.client.BulkProcessor.Listener() {
+        final BulkProcessor.Listener bulkListener = new BulkProcessor.Listener() {
 
             private Record removeAndGetRecordForOperation(BulkProcessor.BulkOperationRequest operation) {
                 return records.remove(operation.getOperationId());
@@ -93,10 +95,10 @@ public class ElasticSearchClient implements AutoCloseable {
                     final Record record = removeAndGetRecordForOperation(operation);
                     record.fail();
                 }
-
-
             }
-        });
+        };
+        // this.client = new ElasticSearchJavaRestClient(config, bulkListener);
+        this.client = new OpenSearchHighLevelRestClient(config, bulkListener);
         this.backoffRetry = new RandomExponentialRetry(elasticSearchConfig.getMaxRetryTimeInSec());
     }
 

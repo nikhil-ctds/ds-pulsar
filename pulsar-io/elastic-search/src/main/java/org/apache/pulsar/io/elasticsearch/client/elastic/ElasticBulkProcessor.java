@@ -52,7 +52,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class ElasticBulkProcessor extends BulkProcessor {
+public class ElasticBulkProcessor implements BulkProcessor {
     private final ElasticSearchConfig config;
     private final ElasticsearchClient client;
 

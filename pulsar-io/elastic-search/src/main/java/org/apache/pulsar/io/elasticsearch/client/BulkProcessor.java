@@ -11,17 +11,17 @@ import java.util.concurrent.TimeUnit;
 /**
  * Processor for "bulk" call to the Elastic REST Endpoint.
  */
-public abstract class BulkProcessor implements Closeable {
+public interface BulkProcessor extends Closeable {
 
     @Builder
     @Getter
-    public static class BulkOperationRequest {
+    class BulkOperationRequest {
         private long operationId;
     }
 
     @Builder
     @Getter
-    public static class BulkOperationResult {
+    class BulkOperationResult {
         private String error;
         private String index;
         private String documentId;
@@ -30,7 +30,7 @@ public abstract class BulkProcessor implements Closeable {
         }
     }
 
-    public interface Listener {
+    interface Listener {
 
         void afterBulk(long executionId, List<BulkOperationRequest> bulkOperationList, List<BulkOperationResult> results);
 
@@ -39,7 +39,7 @@ public abstract class BulkProcessor implements Closeable {
 
     @Builder
     @Getter
-    public static class BulkIndexRequest {
+    class BulkIndexRequest {
         private long requestId;
         private String index;
         private String documentId;
@@ -48,19 +48,19 @@ public abstract class BulkProcessor implements Closeable {
 
     @Builder
     @Getter
-    public static class BulkDeleteRequest {
+    class BulkDeleteRequest {
         private long requestId;
         private String index;
         private String documentId;
     }
 
 
-    public abstract void appendIndexRequest(BulkIndexRequest request) throws IOException;
+    void appendIndexRequest(BulkIndexRequest request) throws IOException;
 
-    public abstract void appendDeleteRequest(BulkDeleteRequest request) throws IOException;
+    void appendDeleteRequest(BulkDeleteRequest request) throws IOException;
 
-    public abstract void flush();
+    void flush();
 
-    public abstract void awaitClose(long timeout, TimeUnit unit) throws InterruptedException;
+    void awaitClose(long timeout, TimeUnit unit) throws InterruptedException;
 
 }
