@@ -267,6 +267,24 @@ public class OpenSearchHighLevelRestClient extends RestClient implements BulkPro
 
     @Override
     public void awaitClose(long timeout, TimeUnit unit) throws InterruptedException {
+        super.close();
+        try {
+            if (internalBulkProcessor != null) {
+                internalBulkProcessor.awaitClose(5000L, TimeUnit.MILLISECONDS);
+            }
+        } catch (InterruptedException e) {
+            log.warn("Elasticsearch bulk processor close error:", e);
+        }
+        try {
+            if (this.client != null) {
+                this.client.close();
+            }
+        } catch (IOException e) {
+            log.warn("Elasticsearch client close error:", e);
+        }
+    }
 
+    public RestHighLevelClient getClient() {
+        return client;
     }
 }

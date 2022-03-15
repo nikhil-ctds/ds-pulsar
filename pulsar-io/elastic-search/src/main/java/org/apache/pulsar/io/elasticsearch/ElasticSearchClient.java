@@ -25,6 +25,7 @@ import org.apache.pulsar.client.api.schema.GenericObject;
 import org.apache.pulsar.functions.api.Record;
 import org.apache.pulsar.io.elasticsearch.client.BulkProcessor;
 import org.apache.pulsar.io.elasticsearch.client.RestClient;
+import org.apache.pulsar.io.elasticsearch.client.RestClientFactory;
 import org.apache.pulsar.io.elasticsearch.client.elastic.ElasticSearchJavaRestClient;
 import org.apache.pulsar.io.elasticsearch.client.opensearch.OpenSearchHighLevelRestClient;
 
@@ -97,8 +98,7 @@ public class ElasticSearchClient implements AutoCloseable {
                 }
             }
         };
-        // this.client = new ElasticSearchJavaRestClient(config, bulkListener);
-        this.client = new OpenSearchHighLevelRestClient(config, bulkListener);
+        this.client = RestClientFactory.createClient(config, bulkListener);
         this.backoffRetry = new RandomExponentialRetry(elasticSearchConfig.getMaxRetryTimeInSec());
     }
 
