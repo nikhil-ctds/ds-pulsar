@@ -29,6 +29,8 @@ import org.apache.pulsar.common.schema.KeyValueEncodingType;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.functions.api.Record;
 import org.apache.pulsar.io.core.SinkContext;
+import org.apache.pulsar.io.elasticsearch.client.RestClient;
+import org.apache.pulsar.io.elasticsearch.client.elastic.ElasticSearchJavaRestClient;
 import org.apache.pulsar.io.elasticsearch.data.UserProfile;
 import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
@@ -175,8 +177,11 @@ public abstract class ElasticSearchSinkTests extends ElasticSearchTestBase {
         sink.open(map, mockSinkContext);
         send(1);
         verify(mockRecord, times(1)).ack();
-        assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
-        assertEquals(sink.getElasticsearchClient().search(index).hits().hits().get(0).id(), "bob");
+        assertEquals(sink.getElasticsearchClient().getRestClient().totalHits(index), 1L);
+
+        final ElasticSearchJavaRestClient restClient = (ElasticSearchJavaRestClient)
+                sink.getElasticsearchClient().getRestClient();
+        assertEquals(restClient.search(index).hits().hits().get(0).id(), "bob");
     }
 
     @Test(enabled = true)
@@ -188,8 +193,10 @@ public abstract class ElasticSearchSinkTests extends ElasticSearchTestBase {
         sink.open(map, mockSinkContext);
         send(1);
         verify(mockRecord, times(1)).ack();
-        assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
-        assertEquals(sink.getElasticsearchClient().search(index).hits().hits().get(0).id(), "[\"bob\",\"boby\"]");
+        assertEquals(sink.getElasticsearchClient().getRestClient().totalHits(index), 1L);
+        final ElasticSearchJavaRestClient restClient = (ElasticSearchJavaRestClient)
+                sink.getElasticsearchClient().getRestClient();
+        assertEquals(restClient.search(index).hits().hits().get(0).id(), "[\"bob\",\"boby\"]");
     }
 
     protected final void send(int numRecords) throws Exception {
@@ -306,9 +313,9 @@ public abstract class ElasticSearchSinkTests extends ElasticSearchTestBase {
                 };
             }
         });
-        assertEquals(sink.getElasticsearchClient().totalHits(index), 1L);
+        assertEquals(sink.getElasticsearchClient().getRestClient().totalHits(index), 1L);
         sink.write(new MockRecordNullValue());
-        assertEquals(sink.getElasticsearchClient().totalHits(index), action.equals(ElasticSearchConfig.NullValueAction.DELETE) ? 0L : 1L);
+        assertEquals(sink.getElasticsearchClient().getRestClient().totalHits(index), action.equals(ElasticSearchConfig.NullValueAction.DELETE) ? 0L : 1L);
         assertNull(sink.getElasticsearchClient().irrecoverableError.get());
     }
 }

@@ -16,22 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pulsar.io.elasticsearch;
+package org.apache.pulsar.io.elasticsearch.client.elastic;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
 import co.elastic.clients.elasticsearch.core.BulkResponse;
+import co.elastic.clients.elasticsearch.core.IndexRequest;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperationVariant;
 import co.elastic.clients.elasticsearch.core.bulk.DeleteOperation;
 import co.elastic.clients.elasticsearch.core.bulk.IndexOperation;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pulsar.io.elasticsearch.ElasticSearchConfig;
+import org.apache.pulsar.io.elasticsearch.RandomExponentialRetry;
+import org.apache.pulsar.io.elasticsearch.client.BulkProcessor;
 
 import java.io.Closeable;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -42,9 +49,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 @Slf4j
-public class BulkProcessor implements Closeable {
+public class ElasticBulkProcessor extends BulkProcessor {
     private final ElasticSearchConfig config;
     private final ElasticsearchClient client;
 
@@ -57,8 +65,9 @@ public class BulkProcessor implements Closeable {
     private final ReentrantLock lock;
     private final ExecutorService internalExecutorService;
     private ScheduledFuture<?> futureFlushTask;
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    public BulkProcessor(ElasticSearchConfig config, ElasticsearchClient client, Listener listener) {
+    public ElasticBulkProcessor(ElasticSearchConfig config, ElasticsearchClient client, Listener listener) {
         this.config = config;
         this.client = client;
         this.lock = new ReentrantLock();
@@ -70,13 +79,39 @@ public class BulkProcessor implements Closeable {
                 config.getBulkConcurrentRequests(), listener);
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
-                new DefaultThreadFactory("elastic-flusher"));
+                new DefaultThreadFactory("elastic-flush-task"));
         if (config.getBulkFlushIntervalInMs() > 0) {
             futureFlushTask = executor.scheduleWithFixedDelay(new Flush(),
                     config.getBulkFlushIntervalInMs(),
                     config.getBulkFlushIntervalInMs(),
                     TimeUnit.MILLISECONDS);
         }
+    }
+
+    @Override
+    public void appendIndexRequest(BulkIndexRequest request) throws IOException {
+        final Map mapped = mapper.readValue(request.getDocumentSource(), Map.class);
+
+        final IndexOperation<Map> indexOperation = new IndexOperation.Builder<Map>()
+                .index(config.getIndexName())
+                .id(request.getDocumentId())
+                .document(mapped)
+                .build();
+
+        long sourceLength = 0;
+        if (config.getBulkSizeInMb() > 0) {
+            sourceLength = request.getDocumentSource().getBytes(StandardCharsets.UTF_8).length;
+        }
+        add(BulkOperationWithId.indexOperation(indexOperation, request.getRequestId(), sourceLength));
+    }
+
+    @Override
+    public void appendDeleteRequest(BulkDeleteRequest request) {
+        final DeleteOperation deleteOperation = new DeleteOperation.Builder()
+                .index(request.getIndex())
+                .id(request.getDocumentId())
+                .build();
+        add(BulkOperationWithId.deleteOperation(deleteOperation, request.getRequestId()));
     }
 
     protected void ensureOpen() {
@@ -139,8 +174,8 @@ public class BulkProcessor implements Closeable {
 
     public void add(BulkOperationWithId bulkOperation) {
         lock.lock();
-        ensureOpen();
         try {
+            ensureOpen();
             this.pendingOperations.add(bulkOperation);
         } finally {
             lock.unlock();
@@ -148,6 +183,7 @@ public class BulkProcessor implements Closeable {
         executeIfNeeded();
     }
 
+    @Override
     public void close() {
         try {
             awaitClose(0L, TimeUnit.NANOSECONDS);
@@ -156,6 +192,7 @@ public class BulkProcessor implements Closeable {
         }
     }
 
+    @Override
     public void awaitClose(long timeout, TimeUnit unit) throws InterruptedException {
         lock.lock();
         try {
@@ -210,21 +247,13 @@ public class BulkProcessor implements Closeable {
         }
     }
 
-    public interface Listener {
-        void beforeBulk(long executionId, BulkRequest bulkRequest);
-
-        void afterBulk(long executionId, BulkRequest bulkRequest, BulkResponse bulkResponse);
-
-        void afterBulk(long executionId, BulkRequest bulkRequest, Throwable throwable);
-    }
-
     class Flush implements Runnable {
         Flush() {
         }
 
         public void run() {
             if (!closed) {
-                BulkProcessor.this.flush();
+                ElasticBulkProcessor.this.flush();
             }
         }
     }
@@ -244,12 +273,11 @@ public class BulkProcessor implements Closeable {
         }
 
         public void execute(final BulkRequest bulkRequest, final long executionId) {
-            this.listener.beforeBulk(executionId, bulkRequest);
             try {
                 this.semaphore.acquire();
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
-                listener.afterBulk(executionId, bulkRequest, ex);
+                listener.afterBulk(executionId, convertBulkRequest(bulkRequest), ex);
                 return;
             }
 
@@ -265,9 +293,8 @@ public class BulkProcessor implements Closeable {
                     log.debug("Sending bulk {} completed", executionId);
                     promise.complete(bulkResponse);
                 } catch (Throwable ex) {
-                    promise.completeExceptionally(ex);
                     log.warn("Failed to execute bulk request " + executionId, ex);
-                    listener.afterBulk(executionId, bulkRequest, ex);
+                    promise.completeExceptionally(ex);
                 }
             };
             internalExecutorService.submit(responseCallable);
@@ -276,12 +303,12 @@ public class BulkProcessor implements Closeable {
 
             promise.thenApply((bulkResponse) -> {
                 this.semaphore.release();
-                listener.afterBulk(executionId, bulkRequest, bulkResponse);
+                listener.afterBulk(executionId, convertBulkRequest(bulkRequest), convertBulkResponse(bulkResponse));
                 listenerCalledPromise.complete(null);
                 return null;
             }).exceptionally(ex -> {
                 this.semaphore.release();
-                listener.afterBulk(executionId, bulkRequest, ex);
+                listener.afterBulk(executionId, convertBulkRequest(bulkRequest), ex);
                 log.warn("Failed to execute bulk request " + executionId, ex);
                 listenerCalledPromise.complete(null);
                 return null;
@@ -299,6 +326,26 @@ public class BulkProcessor implements Closeable {
             } else {
                 return false;
             }
+        }
+
+        private List<BulkOperationRequest> convertBulkRequest(BulkRequest bulkRequest) {
+            return bulkRequest.operations().stream().map(op -> {
+                        BulkOperationWithId opWithId = (BulkOperationWithId) op;
+                        return BulkOperationRequest.builder()
+                                .operationId(opWithId.getOperationId())
+                                .build();
+                    }).collect(Collectors.toList());
+        }
+
+        private List<BulkOperationResult> convertBulkResponse(BulkResponse bulkResponse) {
+            return bulkResponse.items().stream().map(responseItem -> {
+                final String error = responseItem.error() != null ? responseItem.error().type() : null;
+                return BulkOperationResult.builder()
+                        .error(error)
+                        .index(responseItem.index())
+                        .documentId(responseItem.id())
+                        .build();
+            }).collect(Collectors.toList());
         }
     }
 
