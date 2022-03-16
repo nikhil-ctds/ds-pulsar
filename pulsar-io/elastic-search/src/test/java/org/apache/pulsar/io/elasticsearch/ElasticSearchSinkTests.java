@@ -29,8 +29,8 @@ import org.apache.pulsar.common.schema.KeyValueEncodingType;
 import org.apache.pulsar.common.schema.SchemaType;
 import org.apache.pulsar.functions.api.Record;
 import org.apache.pulsar.io.core.SinkContext;
-import org.apache.pulsar.io.elasticsearch.client.RestClient;
 import org.apache.pulsar.io.elasticsearch.client.elastic.ElasticSearchJavaRestClient;
+import org.apache.pulsar.io.elasticsearch.client.opensearch.OpenSearchHighLevelRestClient;
 import org.apache.pulsar.io.elasticsearch.data.UserProfile;
 import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
@@ -38,7 +38,6 @@ import org.mockito.stubbing.Answer;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -179,9 +178,15 @@ public abstract class ElasticSearchSinkTests extends ElasticSearchTestBase {
         verify(mockRecord, times(1)).ack();
         assertEquals(sink.getElasticsearchClient().getRestClient().totalHits(index), 1L);
 
-        final ElasticSearchJavaRestClient restClient = (ElasticSearchJavaRestClient)
-                sink.getElasticsearchClient().getRestClient();
-        assertEquals(restClient.search(index).hits().hits().get(0).id(), "bob");
+        if (elasticImageName.equals(ELASTICSEARCH_8)) {
+            final ElasticSearchJavaRestClient restClient = (ElasticSearchJavaRestClient)
+                    sink.getElasticsearchClient().getRestClient();
+            assertEquals(restClient.search(index).hits().hits().get(0).id(), "bob");
+        } else {
+            final OpenSearchHighLevelRestClient restClient = (OpenSearchHighLevelRestClient)
+                    sink.getElasticsearchClient().getRestClient();
+            assertEquals(restClient.search(index).getHits().getHits()[0].getId(), "bob");
+        }
     }
 
     @Test(enabled = true)
@@ -194,9 +199,15 @@ public abstract class ElasticSearchSinkTests extends ElasticSearchTestBase {
         send(1);
         verify(mockRecord, times(1)).ack();
         assertEquals(sink.getElasticsearchClient().getRestClient().totalHits(index), 1L);
-        final ElasticSearchJavaRestClient restClient = (ElasticSearchJavaRestClient)
-                sink.getElasticsearchClient().getRestClient();
-        assertEquals(restClient.search(index).hits().hits().get(0).id(), "[\"bob\",\"boby\"]");
+        if (elasticImageName.equals(ELASTICSEARCH_8)) {
+            final ElasticSearchJavaRestClient restClient = (ElasticSearchJavaRestClient)
+                    sink.getElasticsearchClient().getRestClient();
+            assertEquals(restClient.search(index).hits().hits().get(0).id(), "[\"bob\",\"boby\"]");
+        } else {
+            final OpenSearchHighLevelRestClient restClient = (OpenSearchHighLevelRestClient)
+                    sink.getElasticsearchClient().getRestClient();
+            assertEquals(restClient.search(index).getHits().getHits()[0].getId(), "[\"bob\",\"boby\"]");
+        }
     }
 
     protected final void send(int numRecords) throws Exception {
