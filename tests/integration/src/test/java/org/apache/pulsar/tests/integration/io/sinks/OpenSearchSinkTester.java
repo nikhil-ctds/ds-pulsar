@@ -18,11 +18,30 @@
  */
 package org.apache.pulsar.tests.integration.io.sinks;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
+import org.apache.http.HttpHost;
 import org.apache.pulsar.tests.integration.topologies.PulsarCluster;
+import org.awaitility.Awaitility;
+import org.opensearch.action.search.SearchRequest;
+import org.opensearch.action.search.SearchResponse;
+import org.opensearch.client.RequestOptions;
+import org.opensearch.client.RestClient;
+import org.opensearch.client.RestClientBuilder;
+import org.opensearch.client.RestHighLevelClient;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.Map;
+
+import static org.testng.Assert.assertTrue;
+
 public class OpenSearchSinkTester extends ElasticSearchSinkTester {
+
+    private RestHighLevelClient elasticClient;
+
 
     public OpenSearchSinkTester(boolean schemaEnable) {
         super(schemaEnable);
@@ -37,5 +56,26 @@ public class OpenSearchSinkTester extends ElasticSearchSinkTester {
                 .withEnv("bootstrap.memory_lock", "true")
                 .withEnv("plugins.security.disabled", "true");
     }
+
+    @Override
+    public void prepareSink() throws Exception {
+        RestClientBuilder builder = RestClient.builder(
+                new HttpHost(
+                        "localhost",
+                        serviceContainer.getMappedPort(9200),
+                        "http"));
+        elasticClient = new RestHighLevelClient(builder);
+    }
+
+    @Override
+    public void validateSinkResult(Map<String, String> kvs) {
+        org.opensearch.action.search.SearchRequest searchRequest = new SearchRequest("test-index");
+
+        Awaitility.await().untilAsserted(() -> {
+            SearchResponse searchResult = elasticClient.search(searchRequest, RequestOptions.DEFAULT);
+            assertTrue(searchResult.getHits().getTotalHits().value > 0, searchResult.toString());
+        });
+    }
+
 
 }

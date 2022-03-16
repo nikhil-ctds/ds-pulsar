@@ -94,11 +94,6 @@ public abstract class ElasticSearchSinkTester extends SinkTester<ElasticsearchCo
     }
 
 
-    /*@Override
-    protected ElasticsearchContainer createSinkService(PulsarCluster cluster) {
-        return new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch:7.16.3-amd64");
-    }*/
-
     @Override
     public void prepareSink() throws Exception {
         RestClientBuilder builder = RestClient.builder(
