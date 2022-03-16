@@ -38,8 +38,7 @@ public class RestClientFactory {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static RestClient createClient(ElasticSearchConfig config, BulkProcessor.Listener bulkListener) throws MalformedURLException {
-
+    public static RestClient createClient(ElasticSearchConfig config, BulkProcessor.Listener bulkListener) throws IOException {
         if (config.getCompatibilityMode() == ElasticSearchConfig.CompatibilityMode.ELASTICSEARCH) {
             log.info("Found compatibilityMode set to '{}', using the ElasticSearch Java client.", config.getCompatibilityMode());
             return new ElasticSearchJavaRestClient(config, bulkListener);
@@ -58,9 +57,9 @@ public class RestClientFactory {
             }
             return new ElasticSearchJavaRestClient(config, bulkListener);
         } catch (IOException ioException) {
-            log.trace("Got error while performing info request: {}, falling back to OpenSearch High Level Rest API Client.",
+            log.warn("Got error while performing info request to detect Elastic version: {}",
                     ioException.getMessage());
-            return new OpenSearchHighLevelRestClient(config, bulkListener);
+            throw ioException;
         }
     }
 
@@ -95,7 +94,7 @@ public class RestClientFactory {
             // For Elastic 8+ use Elastic Java client
             return false;
         } catch (NumberFormatException nfe) {
-            log.debug("Not able to parse version: {}", mainVersion, nfe);
+            log.warn("Not able to parse version: {}", mainVersion, nfe);
             return true;
         }
     }

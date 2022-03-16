@@ -75,8 +75,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OpenSearchHighLevelRestClient extends RestClient implements BulkProcessor {
 
-    private final RestHighLevelClient client;
-    private final org.opensearch.action.bulk.BulkProcessor internalBulkProcessor;
+    private RestHighLevelClient client;
+    private org.opensearch.action.bulk.BulkProcessor internalBulkProcessor;
     private final ConcurrentMap<DocWriteRequest<?>, Long> bulkRequestMappings = new ConcurrentHashMap<>();
 
     public OpenSearchHighLevelRestClient(ElasticSearchConfig elasticSearchConfig, BulkProcessor.Listener bulkProcessorListener) throws MalformedURLException {
@@ -211,7 +211,9 @@ public class OpenSearchHighLevelRestClient extends RestClient implements BulkPro
         deleteRequest.id(documentId);
         deleteRequest.type(config.getTypeName());
         DeleteResponse deleteResponse = client.delete(deleteRequest, RequestOptions.DEFAULT);
-        log.debug("delete result=" + deleteResponse.getResult());
+        if (log.isDebugEnabled()) {
+            log.debug("delete result {}", deleteResponse.getResult());
+        }
         if (deleteResponse.getResult().equals(DocWriteResponse.Result.DELETED)
                 || deleteResponse.getResult().equals(DocWriteResponse.Result.NOT_FOUND)) {
             return true;
@@ -271,6 +273,7 @@ public class OpenSearchHighLevelRestClient extends RestClient implements BulkPro
         try {
             if (internalBulkProcessor != null) {
                 internalBulkProcessor.awaitClose(5000L, TimeUnit.MILLISECONDS);
+                internalBulkProcessor = null;
             }
         } catch (InterruptedException e) {
             log.warn("Elasticsearch bulk processor close error:", e);
@@ -278,6 +281,7 @@ public class OpenSearchHighLevelRestClient extends RestClient implements BulkPro
         try {
             if (this.client != null) {
                 this.client.close();
+                this.client = null;
             }
         } catch (IOException e) {
             log.warn("Elasticsearch client close error:", e);

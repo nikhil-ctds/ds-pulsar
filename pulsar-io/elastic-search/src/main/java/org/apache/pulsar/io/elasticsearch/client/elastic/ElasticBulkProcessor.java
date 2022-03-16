@@ -287,13 +287,17 @@ public class ElasticBulkProcessor implements BulkProcessor {
                 Callable<BulkResponse> callable = () -> client.bulk(bulkRequest);
 
                 try {
-                    log.debug("Sending bulk {}", executionId);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Sending bulk {}", executionId);
+                    }
                     final BulkResponse bulkResponse = retry.retry(callable, config.getMaxRetries(), config.getRetryBackoffInMs(),
                             "bulk");
-                    log.debug("Sending bulk {} completed", executionId);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Sending bulk {} completed", executionId);
+                    }
                     promise.complete(bulkResponse);
                 } catch (Throwable ex) {
-                    log.warn("Failed to execute bulk request " + executionId, ex);
+                    log.warn("Failed to execute bulk request {}", executionId, ex);
                     promise.completeExceptionally(ex);
                 }
             };

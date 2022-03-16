@@ -76,7 +76,9 @@ public class ElasticSearchClient implements AutoCloseable {
             @Override
             public void afterBulk(long executionId, List<BulkProcessor.BulkOperationRequest> bulkOperationList,
                                   List<BulkProcessor.BulkOperationResult> results) {
-                log.trace("Bulk request id={} size={}:", executionId, bulkOperationList.size());
+                if (log.isTraceEnabled()) {
+                    log.trace("Bulk request id={} size={}:", executionId, bulkOperationList.size());
+                }
                 int index = 0;
                 for (BulkProcessor.BulkOperationResult result: results) {
                     final Record record = removeAndGetRecordForOperation(bulkOperationList.get(index++));
@@ -213,7 +215,7 @@ public class ElasticSearchClient implements AutoCloseable {
             records.put(operationId, record);
             client.getBulkProcessor().appendDeleteRequest(bulkDeleteRequest);
         } catch(Exception e) {
-            log.debug("delete failed id=" + id, e);
+            log.debug("delete failed id: {}", id, e);
             record.fail();
             throw e;
         }
@@ -244,7 +246,7 @@ public class ElasticSearchClient implements AutoCloseable {
             }
             return deleted;
         } catch (final Exception ex) {
-            log.debug("index failed id=" + id, ex);
+            log.debug("index failed id: {}", id, ex);
             record.fail();
             throw ex;
         }
@@ -261,6 +263,7 @@ public class ElasticSearchClient implements AutoCloseable {
     public void close() {
         if (client != null) {
             client.close();
+            client = null;
         }
     }
 
