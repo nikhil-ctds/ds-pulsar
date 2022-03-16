@@ -74,6 +74,16 @@ public class PulsarSinksTest extends PulsarIOTestBase {
         testSink(new ElasticSearch8SinkTester(true), true);
     }
 
+    @Test(groups = "sink")
+    public void testOpenSearchSinkRawData() throws Exception {
+        testSink(new OpenSearchSinkTester(false), true);
+    }
+
+    @Test(groups = "sink")
+    public void testOpenSearchSinkSchemaEnabled() throws Exception {
+        testSink(new OpenSearchSinkTester(true), true);
+    }
+
     @Test(enabled = false, groups = "sink")
     public void testRabbitMQSink() throws Exception {
         final String containerName = "rabbitmq-" + randomName(8);

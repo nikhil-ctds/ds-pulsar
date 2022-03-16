@@ -101,7 +101,7 @@ public class ElasticSearchClient implements AutoCloseable {
             }
         };
         this.backoffRetry = new RandomExponentialRetry(elasticSearchConfig.getMaxRetryTimeInSec());
-        this.client = retry(() -> RestClientFactory.createClient(config, bulkListener), "client creation");
+        this.client = retry(() -> RestClientFactory.createClient(config, bulkListener), -1, "client creation");
     }
 
     void failed(Exception e) {
@@ -338,8 +338,12 @@ public class ElasticSearchClient implements AutoCloseable {
     }
 
     private <T> T retry(Callable<T> callable, String source) {
+        return retry(callable, config.getMaxRetries(), source);
+    }
+
+    private <T> T retry(Callable<T> callable, int maxRetries, String source) {
         try {
-            return backoffRetry.retry(callable, config.getMaxRetries(), config.getRetryBackoffInMs(), source);
+            return backoffRetry.retry(callable, maxRetries, config.getRetryBackoffInMs(), source);
         } catch (Exception e) {
             log.error("error in command {} wth retry", source, e);
             throw new ElasticSearchConnectionException(source + " failed", e);
