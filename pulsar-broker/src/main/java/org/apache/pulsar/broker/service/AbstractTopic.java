@@ -77,6 +77,8 @@ import org.apache.pulsar.common.util.FutureUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.HEAD;
+
 public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicPolicies> {
 
     protected static final long POLICY_UPDATE_FAILURE_RETRY_TIME_SECONDS = 60;
@@ -223,12 +225,14 @@ public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicP
         topicPolicies.getMessageTTLInSeconds().updateTopicValue(data.getMessageTTLInSeconds());
         topicPolicies.getPublishRate().updateTopicValue(PublishRate.normalize(data.getPublishRate()));
         topicPolicies.getDelayedDeliveryEnabled().updateTopicValue(data.getDelayedDeliveryEnabled());
-        topicPolicies.getReplicatorDispatchRate().updateTopicValue(normalize(data.getReplicatorDispatchRate()));
+        topicPolicies.getReplicatorDispatchRate().updateTopicValue(
+            DispatchRateImpl.normalize(data.getReplicatorDispatchRate()));
         topicPolicies.getDelayedDeliveryTickTimeMillis().updateTopicValue(data.getDelayedDeliveryTickTimeMillis());
         topicPolicies.getSubscribeRate().updateTopicValue(SubscribeRate.normalize(data.getSubscribeRate()));
-        topicPolicies.getSubscriptionDispatchRate().updateTopicValue(normalize(data.getSubscriptionDispatchRate()));
+        topicPolicies.getSubscriptionDispatchRate().updateTopicValue(
+            DispatchRateImpl.normalize(data.getSubscriptionDispatchRate()));
         topicPolicies.getCompactionThreshold().updateTopicValue(data.getCompactionThreshold());
-        topicPolicies.getDispatchRate().updateTopicValue(normalize(data.getDispatchRate()));
+        topicPolicies.getDispatchRate().updateTopicValue(DispatchRateImpl.normalize(data.getDispatchRate()));
         topicPolicies.getEntryFilters().updateTopicValue(data.getEntryFilters());
     }
 
@@ -284,7 +288,7 @@ public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicP
         if (dispatchRate == null) {
             dispatchRate = namespacePolicies.clusterDispatchRate.get(cluster);
         }
-        topicPolicies.getDispatchRate().updateNamespaceValue(normalize(dispatchRate));
+        topicPolicies.getDispatchRate().updateNamespaceValue(DispatchRateImpl.normalize(dispatchRate));
     }
 
     private void updateNamespaceSubscribeRate(Policies namespacePolicies, String cluster) {
@@ -294,22 +298,12 @@ public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicP
 
     private void updateNamespaceSubscriptionDispatchRate(Policies namespacePolicies, String cluster) {
         topicPolicies.getSubscriptionDispatchRate()
-            .updateNamespaceValue(normalize(namespacePolicies.subscriptionDispatchRate.get(cluster)));
+            .updateNamespaceValue(DispatchRateImpl.normalize(namespacePolicies.subscriptionDispatchRate.get(cluster)));
     }
 
     private void updateNamespaceReplicatorDispatchRate(Policies namespacePolicies, String cluster) {
         topicPolicies.getReplicatorDispatchRate()
-            .updateNamespaceValue(normalize(namespacePolicies.replicatorDispatchRate.get(cluster)));
-    }
-
-    private DispatchRateImpl normalize(DispatchRateImpl dispatchRate) {
-        if (dispatchRate != null
-            && (dispatchRate.getDispatchThrottlingRateInMsg() > 0
-            || dispatchRate.getDispatchThrottlingRateInByte() > 0)) {
-            return dispatchRate;
-        } else {
-            return null;
-        }
+            .updateNamespaceValue(DispatchRateImpl.normalize(namespacePolicies.replicatorDispatchRate.get(cluster)));
     }
 
     private void updateSchemaCompatibilityStrategyNamespaceValue(Policies namespacePolicies){
