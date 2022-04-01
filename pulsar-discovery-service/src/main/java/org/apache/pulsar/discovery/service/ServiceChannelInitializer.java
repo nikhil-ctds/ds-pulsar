@@ -19,6 +19,7 @@
 package org.apache.pulsar.discovery.service;
 
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslProvider;
 import org.apache.pulsar.common.protocol.Commands;
 import org.apache.pulsar.common.util.NettyServerSslContextBuilder;
 import org.apache.pulsar.common.util.SslContextAutoRefreshBuilder;
@@ -65,7 +66,12 @@ public class ServiceChannelInitializer extends ChannelInitializer<SocketChannel>
                         serviceConfig.getTlsProtocols(),
                         serviceConfig.getTlsCertRefreshCheckDurationSec());
             } else {
-                sslCtxRefresher = new NettyServerSslContextBuilder(serviceConfig.isTlsAllowInsecureConnection(),
+                SslProvider sslProvider = null;
+                if (serviceConfig.getTlsProvider() != null) {
+                    sslProvider = SslProvider.valueOf(serviceConfig.getTlsProvider());
+                }
+                sslCtxRefresher = new NettyServerSslContextBuilder(
+                        sslProvider, serviceConfig.isTlsAllowInsecureConnection(),
                         serviceConfig.getTlsTrustCertsFilePath(), serviceConfig.getTlsCertificateFilePath(),
                         serviceConfig.getTlsKeyFilePath(), serviceConfig.getTlsCiphers(), serviceConfig.getTlsProtocols(),
                         serviceConfig.isTlsRequireTrustedClientCertOnConnect(),
