@@ -505,6 +505,11 @@ class ContextImpl implements Context, SinkContext, SourceContext, AutoCloseable 
         return clientBuilder;
     }
 
+    @Override
+    public PulsarClient getPulsarClient() {
+        return client;
+    }
+
     private <O> Producer<O> getProducer(String topicName, Schema<O> schema) throws PulsarClientException {
         Producer<O> producer;
         if (tlPublishProducers != null) {
