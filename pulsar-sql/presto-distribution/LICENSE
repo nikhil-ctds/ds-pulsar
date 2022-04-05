@@ -237,8 +237,6 @@ The Apache Software License, Version 2.0
     - netty-codec-dns-4.1.72.Final.jar
     - netty-codec-http-4.1.72.Final.jar
     - netty-codec-haproxy-4.1.72.Final.jar
-    - netty-codec-socks-4.1.72.Final.jar
-    - netty-handler-proxy-4.1.72.Final.jar
     - netty-common-4.1.72.Final.jar
     - netty-handler-4.1.72.Final.jar
     - netty-reactive-streams-2.0.4.jar
@@ -313,8 +311,8 @@ The Apache Software License, Version 2.0
     - trace-token-0.197.jar
     - units-1.6.jar
    * Apache HTTP Client
-    - httpclient-4.5.5.jar
-    - httpcore-4.4.9.jar
+    - httpclient-4.5.13.jar
+    - httpcore-4.4.13.jar
   * Error Prone Annotations
     - error_prone_annotations-2.3.4.jar
   * Esri Geometry API For Java
@@ -399,15 +397,15 @@ The Apache Software License, Version 2.0
   * RocksDB JNI
     - rocksdbjni-6.10.2.jar
   * SnakeYAML
-    - snakeyaml-1.26.jar
+    - snakeyaml-1.27.jar
   * Bean Validation API
     - validation-api-2.0.1.Final.jar
   * Objectsize
     - objectsize-0.0.12.jar
   * Dropwizard Metrics
-    - metrics-core-3.1.0.jar
-    - metrics-graphite-3.1.0.jar
-    - metrics-jvm-3.1.0.jar
+    - metrics-core-3.2.5.jar
+    - metrics-graphite-3.2.5.jar
+    - metrics-jvm-3.2.5.jar
   * Prometheus
     - simpleclient-0.5.0.jar
     - simpleclient_common-0.5.0.jar
