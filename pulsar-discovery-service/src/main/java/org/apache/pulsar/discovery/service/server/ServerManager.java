@@ -20,6 +20,7 @@ package org.apache.pulsar.discovery.service.server;
 
 import com.google.common.collect.Lists;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,6 +85,8 @@ public class ServerManager {
                             config.getTlsTrustStore(),
                             config.getTlsTrustStorePassword(),
                             config.isTlsRequireTrustedClientCertOnConnect(),
+                            Collections.emptySet(),
+                            Collections.emptySet(),
                             config.getTlsCertRefreshCheckDurationSec()
                     );
                 } else {
