@@ -54,7 +54,7 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
     static ElasticsearchContainer container;
     static ElasticSearchConfig config;
     static ElasticSearchClient client;
-    static Network network = Network.newNetwork();
+    static Network network;
 
     public ElasticSearchClientTests(String elasticImageName) {
         super(elasticImageName);
@@ -65,6 +65,7 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
         if (container != null) {
             return;
         }
+        network = Network.newNetwork();
         container = createElasticsearchContainer().withNetwork(network);
         container.start();
 
@@ -84,7 +85,9 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
     @AfterClass(alwaysRun = true)
     public static void closeAfterClass() {
         container.close();
+        container = null;
         network.close();
+        network = null;
     }
 
     static class MockRecord<T> implements Record<T> {
@@ -331,10 +334,11 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
                     log.info("elapsed = {}", elapsed);
                     assertTrue(elapsed > 29000); // bulkIndex was blocking while elasticsearch was down or busy
 
-                    Thread.sleep(3000L);
-                    assertEquals(mockRecord.acked, 15);
-                    assertEquals(mockRecord.failed, 0);
-                    assertEquals(client.records.size(), 0);
+                    Awaitility.await().untilAsserted(() -> {
+                        assertEquals(mockRecord.acked, 15);
+                        assertEquals(mockRecord.failed, 0);
+                        assertEquals(client.records.size(), 0);
+                    });
 
                 } finally {
                     client.getRestClient().deleteIndex(index);
