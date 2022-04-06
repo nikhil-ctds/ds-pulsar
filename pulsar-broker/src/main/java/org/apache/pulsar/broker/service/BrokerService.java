@@ -84,6 +84,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerException.ManagedLedgerNotFoundException;
 import org.apache.bookkeeper.mledger.ManagedLedgerFactory;
+import org.apache.bookkeeper.mledger.impl.NullLedgerOffloader;
 import org.apache.bookkeeper.mledger.util.Futures;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -100,6 +101,7 @@ import org.apache.pulsar.broker.delayed.DelayedDeliveryTrackerFactory;
 import org.apache.pulsar.broker.delayed.DelayedDeliveryTrackerLoader;
 import org.apache.pulsar.broker.intercept.BrokerInterceptor;
 import org.apache.pulsar.broker.loadbalance.LoadManager;
+import org.apache.pulsar.broker.namespace.NamespaceService;
 import org.apache.pulsar.broker.service.BrokerServiceException.NamingException;
 import org.apache.pulsar.broker.service.BrokerServiceException.NotAllowedException;
 import org.apache.pulsar.broker.service.BrokerServiceException.PersistenceException;
@@ -1260,17 +1262,22 @@ public class BrokerService implements Closeable, ZooKeeperCacheListener<Policies
                     topicLevelOffloadPolicies,
                     OffloadPolicies.oldPoliciesCompatible(nsLevelOffloadPolicies, policies.orElse(null)),
                     getPulsar().getConfig().getProperties());
-            if (topicLevelOffloadPolicies != null) {
-                try {
-                    LedgerOffloader topicLevelLedgerOffLoader = pulsar().createManagedLedgerOffloader(offloadPolicies);
-                    managedLedgerConfig.setLedgerOffloader(topicLevelLedgerOffLoader);
-                } catch (PulsarServerException e) {
-                    future.completeExceptionally(e);
-                    return;
+            if (NamespaceService.isSystemServiceNamespace(namespace.toString())) {
+                managedLedgerConfig.setLedgerOffloader(NullLedgerOffloader.INSTANCE);
+            } else  {
+                if (topicLevelOffloadPolicies != null) {
+                    try {
+                        LedgerOffloader topicLevelLedgerOffLoader =
+                                pulsar().createManagedLedgerOffloader(offloadPolicies);
+                        managedLedgerConfig.setLedgerOffloader(topicLevelLedgerOffLoader);
+                    } catch (PulsarServerException e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    //If the topic level policy is null, use the namespace level
+                    managedLedgerConfig
+                            .setLedgerOffloader(pulsar.getManagedLedgerOffloader(namespace, offloadPolicies));
                 }
-            } else {
-                //If the topic level policy is null, use the namespace level
-                managedLedgerConfig.setLedgerOffloader(pulsar.getManagedLedgerOffloader(namespace, offloadPolicies));
             }
 
             managedLedgerConfig.setDeletionAtBatchIndexLevelEnabled(serviceConfig.isAcknowledgmentAtBatchIndexLevelEnabled());
