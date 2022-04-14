@@ -105,6 +105,23 @@ public class WebSocketProxyConfiguration implements PulsarConfiguration {
     private int numHttpServerThreads = Math.max(6, Runtime.getRuntime().availableProcessors());
 
     // Number of connections per Broker in Pulsar Client used in WebSocket proxy
+    @FieldContext(doc = "Max concurrent web requests")
+    private int maxConcurrentHttpRequests = 1024;
+
+    @FieldContext(doc = "Capacity for thread pool queue in the HTTP server"
+                    + " Default is set to 8192."
+    )
+    private int httpServerThreadPoolQueueSize = 8192;
+
+    @FieldContext(doc = "Capacity for accept queue in the HTTP server"
+                    + " Default is set to 8192."
+    )
+    private int httpServerAcceptQueueSize = 8192;
+
+    @FieldContext(doc = "Maximum number of inbound http connections. "
+            + "(0 to disable limiting)")
+    private int maxHttpServerConnections = 2048;
+
     private int webSocketConnectionsPerBroker = Runtime.getRuntime().availableProcessors();
     // Time in milliseconds that idle WebSocket session times out
     private int webSocketSessionIdleTimeoutMillis = 300000;
