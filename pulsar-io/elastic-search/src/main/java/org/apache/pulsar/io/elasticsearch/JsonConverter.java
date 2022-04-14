@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericEnumSymbol;
 import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 
@@ -192,7 +191,7 @@ public class JsonConverter {
 
     public static ArrayNode toJsonArray(JsonNode jsonNode, List<String> fields) {
         ArrayNode arrayNode = jsonNodeFactory.arrayNode();
-        Iterator<String>  it = jsonNode.fieldNames();
+        Iterator<String> it = jsonNode.fieldNames();
         while (it.hasNext()) {
             String fieldName = it.next();
             if (fields.contains(fieldName)) {
