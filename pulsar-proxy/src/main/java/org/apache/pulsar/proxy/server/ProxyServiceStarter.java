@@ -195,7 +195,12 @@ public class ProxyServiceStarter {
     }
 
     public static void main(String[] args) throws Exception {
-        new ProxyServiceStarter(args);
+        try {
+            new ProxyServiceStarter(args);
+        } catch (Throwable t) {
+            log.error("Failed to start proxy.", t);
+            Runtime.getRuntime().halt(1);
+        }
     }
 
     public static void addWebServerHandlers(WebServer server,
