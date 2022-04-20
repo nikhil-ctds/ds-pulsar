@@ -180,10 +180,10 @@ public class ElasticSearchConfig implements Serializable {
 
     @FieldDoc(
             required = false,
-            defaultValue = "-1",
-            help = "The bulk flush interval flushing any bulk request pending if the interval passes. Default is -1 meaning not set."
+            defaultValue = "10000",
+            help = "The bulk flush interval flushing any bulk request pending if the interval passes. -1 or zero means the interval flushing is disabled."
     )
-    private long bulkFlushIntervalInMs = -1;
+    private long bulkFlushIntervalInMs = 10000L;
 
     // connection settings, see https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/java-rest-low-config.html
     @FieldDoc(
