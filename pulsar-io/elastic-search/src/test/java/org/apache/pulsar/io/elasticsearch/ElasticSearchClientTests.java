@@ -202,6 +202,7 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
                 .setElasticSearchUrl("http://"+container.getHttpHostAddress())
                 .setIndexName(index)
                 .setBulkEnabled(true)
+                .setBulkFlushIntervalInMs(-1L)
                 .setMalformedDocAction(ElasticSearchConfig.MalformedDocAction.FAIL);
         try (ElasticSearchClient client = new ElasticSearchClient(config);) {
             MockRecord<GenericObject> mockRecord = new MockRecord<>();
@@ -225,6 +226,7 @@ public abstract class ElasticSearchClientTests extends ElasticSearchTestBase {
                 .setElasticSearchUrl("http://"+container.getHttpHostAddress())
                 .setIndexName(index)
                 .setBulkEnabled(true)
+                .setBulkFlushIntervalInMs(-1)
                 .setMalformedDocAction(ElasticSearchConfig.MalformedDocAction.IGNORE);
         try (ElasticSearchClient client = new ElasticSearchClient(config);) {
             MockRecord<GenericObject> mockRecord = new MockRecord<>();
