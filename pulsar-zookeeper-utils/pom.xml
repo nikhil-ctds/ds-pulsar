@@ -40,19 +40,40 @@
     </dependency>
 
     <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
+      <groupId>com.datastax.oss</groupId>
       <artifactId>bookkeeper-server</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
+      <groupId>com.datastax.oss</groupId>
       <artifactId>stream-storage-server</artifactId>
       <exclusions>
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-all</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.datastax.oss.tests</groupId>
+          <artifactId>stream-storage-tests-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.zookeeper</groupId>
+          <artifactId>zookeeper</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.inferred</groupId>
+          <artifactId>freebuilder</artifactId>
+        </exclusion>
       </exclusions>
+    </dependency>
+
+    <dependency>
+         <groupId>org.apache.curator</groupId>
+         <artifactId>curator-recipes</artifactId>
     </dependency>
 
     <!-- `grpc-all` is excluded from `stream-storage-server` at root pom file -->
@@ -68,7 +89,7 @@
     </dependency>
 
     <dependency>
-      <groupId>org.apache.bookkeeper.stats</groupId>
+      <groupId>com.datastax.oss</groupId>
       <artifactId>prometheus-metrics-provider</artifactId>
     </dependency>
 

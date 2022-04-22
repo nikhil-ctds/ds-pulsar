@@ -41,7 +41,7 @@
       <exclusions>
         <!-- exclude the dependencies already exists in bookkeeper-server-shaded -->
         <exclusion>
-          <groupId>org.apache.bookkeeper</groupId>
+          <groupId>com.datastax.oss</groupId>
           <artifactId>bookkeeper-common</artifactId>
         </exclusion>
         <!-- exclude `pulsar-client-admin-shaded-for-functions` here, this allows worker-runner and broker to use unshaded clients -->
@@ -54,7 +54,7 @@
 
     <!-- bookkeeper-server-shaded include circe-checksum, bookkeeper-common and bookkeeper-stats-api -->
     <dependency>
-      <groupId>org.apache.bookkeeper</groupId>
+      <groupId>com.datastax.oss</groupId>
       <artifactId>bookkeeper-server-shaded</artifactId>
     </dependency>
   </dependencies>
