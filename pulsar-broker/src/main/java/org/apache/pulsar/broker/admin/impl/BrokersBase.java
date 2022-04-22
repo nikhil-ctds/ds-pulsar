@@ -20,12 +20,17 @@ package org.apache.pulsar.broker.admin.impl;
 
 import static org.apache.pulsar.broker.service.BrokerService.BROKER_SERVICE_CONFIGURATION_PATH;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Collectors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
@@ -58,6 +63,7 @@ import org.apache.pulsar.common.conf.InternalConfigurationData;
 import org.apache.pulsar.common.policies.data.NamespaceOwnershipStatus;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 import org.apache.pulsar.zookeeper.ZooKeeperDataCache;
+import org.apache.pulsar.common.util.ThreadDumpUtil;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooDefs;
 import org.slf4j.Logger;
@@ -75,6 +81,10 @@ import io.swagger.annotations.ApiResponses;
 public class BrokersBase extends AdminResource {
     private static final Logger LOG = LoggerFactory.getLogger(BrokersBase.class);
     private int serviceConfigZkVersion = -1;
+    // log a full thread dump when a deadlock is detected in healthcheck once every 10 minutes
+    // to prevent excessive logging
+    private static final long LOG_THREADDUMP_INTERVAL_WHEN_DEADLOCK_DETECTED = 600000L;
+    private volatile long threadDumpLoggedTimestamp;
 
     @GET
     @Path("/{cluster}")
@@ -298,6 +308,9 @@ public class BrokersBase extends AdminResource {
         @ApiResponse(code = 500, message = "Internal server error")})
     public void healthcheck(@Suspended AsyncResponse asyncResponse) throws Exception {
         validateSuperUserAccess();
+
+        checkDeadlockedThreads();
+
         String heartbeatNamespace = NamespaceService.getHeartbeatNamespace(
                 pulsar().getAdvertisedAddress(), pulsar().getConfiguration());
         String topic = String.format("persistent://%s/healthcheck", heartbeatNamespace);
@@ -372,6 +385,26 @@ public class BrokersBase extends AdminResource {
                     asyncResponse.resume("ok");
                 }
             });
+    }
+
+    private void checkDeadlockedThreads() {
+        ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        long[] threadIds = threadBean.findDeadlockedThreads();
+        if (threadIds != null && threadIds.length > 0) {
+            ThreadInfo[] threadInfos = threadBean.getThreadInfo(threadIds, false, false);
+            String threadNames = Arrays.stream(threadInfos)
+                    .map(threadInfo -> threadInfo.getThreadName() + "(tid=" + threadInfo.getThreadId() + ")").collect(
+                            Collectors.joining(", "));
+            if (System.currentTimeMillis() - threadDumpLoggedTimestamp
+                    > LOG_THREADDUMP_INTERVAL_WHEN_DEADLOCK_DETECTED) {
+                threadDumpLoggedTimestamp = System.currentTimeMillis();
+                LOG.error("Deadlocked threads detected. {}\n{}", threadNames,
+                        ThreadDumpUtil.buildThreadDiagnosticString());
+            } else {
+                LOG.error("Deadlocked threads detected. {}", threadNames);
+            }
+            throw new IllegalStateException("Deadlocked threads detected. " + threadNames);
+        }
     }
 
     private void healthcheckReadLoop(CompletableFuture<Reader<String>> readerFuture,
