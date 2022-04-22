@@ -24,8 +24,12 @@ import com.google.common.collect.Maps;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +38,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -64,6 +69,7 @@ import org.apache.pulsar.common.conf.InternalConfigurationData;
 import org.apache.pulsar.common.policies.data.BrokerInfo;
 import org.apache.pulsar.common.policies.data.NamespaceOwnershipStatus;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.pulsar.common.util.ThreadDumpUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +80,10 @@ public class BrokersBase extends PulsarWebResource {
     private static final Logger LOG = LoggerFactory.getLogger(BrokersBase.class);
     private static final Duration HEALTHCHECK_READ_TIMEOUT = Duration.ofSeconds(10);
     public static final String HEALTH_CHECK_TOPIC_SUFFIX = "healthcheck";
+    // log a full thread dump when a deadlock is detected in healthcheck once every 10 minutes
+    // to prevent excessive logging
+    private static final long LOG_THREADDUMP_INTERVAL_WHEN_DEADLOCK_DETECTED = 600000L;
+    private volatile long threadDumpLoggedTimestamp;
 
     @GET
     @Path("/{cluster}")
@@ -307,6 +317,7 @@ public class BrokersBase extends PulsarWebResource {
         @ApiResponse(code = 500, message = "Internal server error")})
     public void healthcheck(@Suspended AsyncResponse asyncResponse) {
         validateSuperUserAccess();
+        checkDeadlockedThreads();
         internalRunHealthCheck()
                 .thenAccept(__ -> {
                     LOG.info("[{}] Successfully run health check.", clientAppId());
@@ -317,6 +328,27 @@ public class BrokersBase extends PulsarWebResource {
                     return null;
                 });
     }
+
+    private void checkDeadlockedThreads() {
+        ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        long[] threadIds = threadBean.findDeadlockedThreads();
+        if (threadIds != null && threadIds.length > 0) {
+            ThreadInfo[] threadInfos = threadBean.getThreadInfo(threadIds, false, false);
+            String threadNames = Arrays.stream(threadInfos)
+                    .map(threadInfo -> threadInfo.getThreadName() + "(tid=" + threadInfo.getThreadId() + ")").collect(
+                            Collectors.joining(", "));
+            if (System.currentTimeMillis() - threadDumpLoggedTimestamp
+                    > LOG_THREADDUMP_INTERVAL_WHEN_DEADLOCK_DETECTED) {
+                threadDumpLoggedTimestamp = System.currentTimeMillis();
+                LOG.error("Deadlocked threads detected. {}\n{}", threadNames,
+                        ThreadDumpUtil.buildThreadDiagnosticString());
+            } else {
+                LOG.error("Deadlocked threads detected. {}", threadNames);
+            }
+            throw new IllegalStateException("Deadlocked threads detected. " + threadNames);
+        }
+    }
+
 
     private CompletableFuture<Void> internalRunHealthCheck() {
         String topic;

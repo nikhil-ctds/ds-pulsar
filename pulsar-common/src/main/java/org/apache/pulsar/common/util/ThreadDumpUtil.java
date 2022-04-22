@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pulsar.tests;
+package org.apache.pulsar.common.util;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -25,21 +25,18 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import javax.management.JMException;
 import javax.management.ObjectName;
 
 /**
- * Adapted from Hadoop TimedOutTestsListener
+ * Adapted from Hadoop TimedOutTestsListener.
  *
  * https://raw.githubusercontent.com/apache/hadoop/master/hadoop-common-project/hadoop-common/src/test/java/org/apache/hadoop/test/TimedOutTestsListener.java
  */
 public class ThreadDumpUtil {
-    static final String TEST_TIMED_OUT_PREFIX = "test timed out after";
-
     private static final String INDENT = "    ";
 
     public static String buildThreadDiagnosticString() {
@@ -68,15 +65,14 @@ public class ThreadDumpUtil {
         // fallback to using JMX for creating the thread dump
         StringBuilder dump = new StringBuilder();
 
-        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss,SSS");
-        dump.append(String.format("Timestamp: %s", dateFormat.format(new Date())));
+        dump.append(String.format("Timestamp: %s", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(LocalDateTime.now())));
         dump.append("\n\n");
 
         Map<Thread, StackTraceElement[]> stackTraces = Thread.getAllStackTraces();
         for (Map.Entry<Thread, StackTraceElement[]> e : stackTraces.entrySet()) {
             Thread thread = e.getKey();
             dump.append('\n');
-            dump.append(String.format("\"%s\" %s prio=%d tid=%d %s\njava.lang.Thread.State: %s", thread.getName(),
+            dump.append(String.format("\"%s\" %s prio=%d tid=%d %s%njava.lang.Thread.State: %s", thread.getName(),
                     (thread.isDaemon() ? "daemon" : ""), thread.getPriority(), thread.getId(),
                     Thread.State.WAITING.equals(thread.getState()) ? "in Object.wait()" : thread.getState().name(),
                     Thread.State.WAITING.equals(thread.getState()) ? "WAITING (on object monitor)"
