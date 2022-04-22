@@ -240,7 +240,6 @@ The Apache Software License, Version 2.0
     - netty-handler-proxy-4.1.76.Final.jar
     - netty-common-4.1.76.Final.jar
     - netty-handler-4.1.76.Final.jar
-    - netty-handler-proxy-4.1.74.Final.jar
     - netty-reactive-streams-2.0.4.jar
     - netty-resolver-4.1.76.Final.jar
     - netty-resolver-dns-4.1.76.Final.jar
@@ -256,15 +255,6 @@ The Apache Software License, Version 2.0
     - netty-transport-native-epoll-4.1.76.Final-linux-x86_64.jar
     - netty-transport-native-unix-common-4.1.76.Final.jar
     - netty-transport-native-unix-common-4.1.76.Final-linux-x86_64.jar
-    - netty-codec-http2-4.1.76.Final.jar
-    - grpc-api-1.45.1.jar
-    - grpc-context-1.45.1.jar
-    - grpc-core-1.45.1.jar
-    - grpc-grpclb-1.45.1.jar
-    - grpc-netty-1.45.1.jar
-    - grpc-protobuf-1.45.1.jar
-    - grpc-protobuf-lite-1.45.1.jar
-    - grpc-stub-1.45.1.jar
  * Joda Time
     - joda-time-2.10.5.jar
   * Jetty
@@ -480,8 +470,6 @@ The Apache Software License, Version 2.0
 Protocol Buffers License
  * Protocol Buffers
    - protobuf-java-3.19.2.jar
-   - protobuf-java-util-3.19.2.jar
-   - proto-google-common-protos-2.0.1.jar
 
 BSD 3-clause "New" or "Revised" License
   *  RE2J TD -- re2j-td-1.4.jar
@@ -527,7 +515,6 @@ CDDL-1.1 -- licenses/LICENSE-CDDL-1.1.txt
    - hk2-utils-2.6.1.jar
    - aopalliance-repackaged-2.6.1.jar
  * Jersey
-    - jaxrs-0.195.jar
     - jersey-client-2.34.jar
     - jersey-container-servlet-2.34.jar
     - jersey-container-servlet-core-2.34.jar
