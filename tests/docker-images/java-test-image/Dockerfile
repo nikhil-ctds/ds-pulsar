@@ -17,7 +17,7 @@
 # under the License.
 #
 
-FROM eclipse-temurin:11.0.14_9-jdk
+FROM eclipse-temurin:11.0.15_10-jdk
 
 RUN groupadd -g 10001 pulsar
 RUN adduser -u 10000 --gid 10001 --disabled-login --disabled-password --gecos '' pulsar
