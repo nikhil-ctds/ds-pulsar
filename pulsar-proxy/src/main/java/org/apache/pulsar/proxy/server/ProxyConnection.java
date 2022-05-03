@@ -22,7 +22,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.haproxy.HAProxyMessage;
-import io.netty.resolver.dns.DnsNameResolver;
+import io.netty.resolver.dns.DnsAddressResolverGroup;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Collections;
@@ -82,7 +82,7 @@ public class ProxyConnection extends PulsarHandler {
     private final AtomicLong requestIdGenerator =
             new AtomicLong(ThreadLocalRandom.current().nextLong(0, Long.MAX_VALUE / 2));
     private final ProxyService service;
-    private final DnsNameResolver dnsNameResolver;
+    private final DnsAddressResolverGroup dnsAddressResolverGroup;
     AuthenticationDataSource authenticationData;
     private State state;
     private final Supplier<SslHandler> sslHandlerSupplier;
@@ -135,10 +135,10 @@ public class ProxyConnection extends PulsarHandler {
     }
 
     public ProxyConnection(ProxyService proxyService, Supplier<SslHandler> sslHandlerSupplier,
-                           DnsNameResolver dnsNameResolver) {
+                           DnsAddressResolverGroup dnsAddressResolverGroup) {
         super(30, TimeUnit.SECONDS);
         this.service = proxyService;
-        this.dnsNameResolver = dnsNameResolver;
+        this.dnsAddressResolverGroup = dnsAddressResolverGroup;
         this.state = State.Init;
         this.sslHandlerSupplier = sslHandlerSupplier;
         this.brokerProxyValidator = service.getBrokerProxyValidator();
@@ -281,7 +281,8 @@ public class ProxyConnection extends PulsarHandler {
 
         if (this.connectionPool == null) {
             this.connectionPool = new ConnectionPool(clientConf, service.getWorkerGroup(),
-                    clientCnxSupplier, Optional.of(dnsNameResolver));
+                    clientCnxSupplier,
+                    Optional.of(dnsAddressResolverGroup.getResolver(service.getWorkerGroup().next())));
         } else {
             LOG.error("BUG! Connection Pool has already been created for proxy connection to {} state {} role {}",
                     remoteAddress, state, clientAuthRole);
