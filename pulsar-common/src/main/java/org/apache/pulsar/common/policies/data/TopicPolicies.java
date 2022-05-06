@@ -73,6 +73,12 @@ public class TopicPolicies {
     private SchemaCompatibilityStrategy schemaCompatibilityStrategy;
     private EntryFilters entryFilters;
 
+    /**
+     * Subscription level policies for specific subscription.
+     */
+    @Builder.Default
+    private Map<String/*subscription*/, SubscriptionPolicies> subscriptionPolicies = new HashMap<>();
+
     public boolean isGlobalPolicies() {
         return isGlobal != null && isGlobal;
     }

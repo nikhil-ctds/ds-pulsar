@@ -69,6 +69,7 @@ import org.apache.pulsar.common.policies.data.PublishRate;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.SchemaCompatibilityStrategy;
 import org.apache.pulsar.common.policies.data.SubscribeRate;
+import org.apache.pulsar.common.policies.data.SubscriptionPolicies;
 import org.apache.pulsar.common.policies.data.TopicPolicies;
 import org.apache.pulsar.common.policies.data.impl.DispatchRateImpl;
 import org.apache.pulsar.common.protocol.schema.SchemaData;
@@ -77,7 +78,6 @@ import org.apache.pulsar.common.util.FutureUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.HEAD;
 
 public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicPolicies> {
 
@@ -145,6 +145,8 @@ public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicP
             AtomicLongFieldUpdater.newUpdater(AbstractTopic.class, "usageCount");
     private volatile long usageCount = 0;
 
+    private Map<String/*subscription*/, SubscriptionPolicies> subscriptionPolicies = Collections.emptyMap();
+
     protected final LongAdder msgOutFromRemovedSubscriptions = new LongAdder();
     protected final LongAdder bytesOutFromRemovedSubscriptions = new LongAdder();
     protected ImmutableMap<String, EntryFilterWithClassLoader> entryFilters;
@@ -168,8 +170,11 @@ public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicP
         return this.topicPolicies.getSubscribeRate().get();
     }
 
-    public DispatchRateImpl getSubscriptionDispatchRate() {
-        return this.topicPolicies.getSubscriptionDispatchRate().get();
+    public DispatchRateImpl getSubscriptionDispatchRate(String subscriptionName) {
+        return Optional.ofNullable(subscriptionPolicies.get(subscriptionName))
+                .map(SubscriptionPolicies::getDispatchRate)
+                .map(DispatchRateImpl::normalize)
+                .orElse(this.topicPolicies.getSubscriptionDispatchRate().get());
     }
 
     public SchemaCompatibilityStrategy getSchemaCompatibilityStrategy() {
@@ -234,6 +239,7 @@ public abstract class AbstractTopic implements Topic, TopicPolicyListener<TopicP
         topicPolicies.getCompactionThreshold().updateTopicValue(data.getCompactionThreshold());
         topicPolicies.getDispatchRate().updateTopicValue(DispatchRateImpl.normalize(data.getDispatchRate()));
         topicPolicies.getEntryFilters().updateTopicValue(data.getEntryFilters());
+        this.subscriptionPolicies = data.getSubscriptionPolicies();
     }
 
     protected void updateTopicPolicyByNamespacePolicy(Policies namespacePolicies) {

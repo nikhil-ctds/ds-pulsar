@@ -338,4 +338,8 @@ public abstract class AbstractBaseDispatcher extends EntryFilterSupport implemen
     public long getFilterRescheduledMsgCount() {
         return this.filterRescheduledMsgs.longValue();
     }
+
+    protected String getSubscriptionName() {
+        return subscription == null ? null : subscription.getName();
+    }
 }
