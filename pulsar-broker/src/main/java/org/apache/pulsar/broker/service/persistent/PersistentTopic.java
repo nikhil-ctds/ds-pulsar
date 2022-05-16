@@ -2007,7 +2007,12 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                     if (includeLedgerMetadata) {
                         futures.add(ml.getLedgerMetadata(li.getLedgerId()).handle((lMetadata, ex) -> {
                             if (ex == null) {
+                                if (lMetadata == null) {
+                                    log.warn("Got empty metadata from BK readHandle");
+                                }
                                 info.metadata = lMetadata;
+                            } else {
+                                log.warn("Got error while getting ledger metadata: " + ex, ex);
                             }
                             return null;
                         }));
