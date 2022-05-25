@@ -2735,7 +2735,7 @@ public class BrokerService implements Closeable, ZooKeeperCacheListener<Policies
         log.debug("No autoSubscriptionCreateOverride policy found for {}", topicName);
         return null;
     }
-    private boolean isSystemTopic(String topic) {
+    public boolean isSystemTopic(String topic) {
         return SystemTopicClient.isSystemTopic(TopicName.get(topic));
     }
 
