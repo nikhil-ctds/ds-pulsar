@@ -113,8 +113,6 @@ public class WebService implements AutoCloseable {
                             config.getTlsTrustStore(),
                             config.getTlsTrustStorePassword(),
                             config.isTlsRequireTrustedClientCertOnConnect(),
-                            config.getWebServiceTlsCiphers(),
-                            config.getWebServiceTlsProtocols(),
                             config.getTlsCertRefreshCheckDurationSec()
                     );
                 } else {

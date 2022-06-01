@@ -256,8 +256,7 @@ public class KeyStoreSSLContext {
         return keyStoreSSLContext;
     }
 
-    // the web server only use this method to get SSLContext, it won't use this to configure engine
-    // no need ciphers and protocols
+    // for web server use case, no need ciphers and protocols
     public static SSLContext createServerSslContext(String sslProviderString,
                                                     String keyStoreTypeString,
                                                     String keyStorePath,
@@ -336,19 +335,18 @@ public class KeyStoreSSLContext {
     }
 
     // for web server. autoRefresh is default true.
-    public static SslContextFactory.Server createSslContextFactory(String sslProviderString,
-                                                                   String keyStoreTypeString,
-                                                                   String keyStore,
-                                                                   String keyStorePassword,
-                                                                   boolean allowInsecureConnection,
-                                                                   String trustStoreTypeString,
-                                                                   String trustStore,
-                                                                   String trustStorePassword,
-                                                                   boolean requireTrustedClientCertOnConnect,
-                                                                   Set<String> ciphers,
-                                                                   Set<String> protocols,
-                                                                   long certRefreshInSec) {
-        SslContextFactory.Server sslCtxFactory;
+    public static SslContextFactory createSslContextFactory(String sslProviderString,
+                                                            String keyStoreTypeString,
+                                                            String keyStore,
+                                                            String keyStorePassword,
+                                                            boolean allowInsecureConnection,
+                                                            String trustStoreTypeString,
+                                                            String trustStore,
+                                                            String trustStorePassword,
+                                                            boolean requireTrustedClientCertOnConnect,
+                                                            long certRefreshInSec)
+            throws GeneralSecurityException, IOException {
+        SslContextFactory sslCtxFactory;
 
         if (sslProviderString == null) {
             Provider provider = SecurityUtility.CONSCRYPT_PROVIDER;
@@ -357,7 +355,7 @@ public class KeyStoreSSLContext {
             }
         }
 
-        sslCtxFactory = new JettySslContextFactoryWithAutoRefresh(
+        sslCtxFactory = new SslContextFactoryWithAutoRefresh(
                 sslProviderString,
                 keyStoreTypeString,
                 keyStore,
@@ -367,8 +365,6 @@ public class KeyStoreSSLContext {
                 trustStore,
                 trustStorePassword,
                 requireTrustedClientCertOnConnect,
-                ciphers,
-                protocols,
                 certRefreshInSec);
 
         if (requireTrustedClientCertOnConnect) {

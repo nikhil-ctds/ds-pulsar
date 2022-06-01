@@ -18,29 +18,30 @@
  */
 package org.apache.pulsar.common.util.keystoretls;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-
-import java.util.Set;
 
 /**
  * SslContextFactoryWithAutoRefresh that create SSLContext for web server, and refresh in time.
  */
-public class JettySslContextFactoryWithAutoRefresh extends SslContextFactory.Server {
+public class SslContextFactoryWithAutoRefresh extends SslContextFactory {
     private final NetSslContextBuilder sslCtxRefresher;
 
-    public JettySslContextFactoryWithAutoRefresh(String sslProviderString,
-                                                 String keyStoreTypeString,
-                                                 String keyStore,
-                                                 String keyStorePassword,
-                                                 boolean allowInsecureConnection,
-                                                 String trustStoreTypeString,
-                                                 String trustStore,
-                                                 String trustStorePassword,
-                                                 boolean requireTrustedClientCertOnConnect,
-                                                 Set<String> ciphers,
-                                                 Set<String> protocols,
-                                                 long certRefreshInSec) {
+    public SslContextFactoryWithAutoRefresh(String sslProviderString,
+                                            String keyStoreTypeString,
+                                            String keyStore,
+                                            String keyStorePassword,
+                                            boolean allowInsecureConnection,
+                                            String trustStoreTypeString,
+                                            String trustStore,
+                                            String trustStorePassword,
+                                            boolean requireTrustedClientCertOnConnect,
+                                            long certRefreshInSec)
+            throws SSLException, FileNotFoundException, GeneralSecurityException, IOException {
         super();
         sslCtxRefresher = new NetSslContextBuilder(
                 sslProviderString,
@@ -53,12 +54,6 @@ public class JettySslContextFactoryWithAutoRefresh extends SslContextFactory.Ser
                 trustStorePassword,
                 requireTrustedClientCertOnConnect,
                 certRefreshInSec);
-        if (ciphers != null && ciphers.size() > 0) {
-            this.setIncludeCipherSuites(ciphers.toArray(new String[0]));
-        }
-        if (protocols != null && protocols.size() > 0) {
-            this.setIncludeProtocols(protocols.toArray(new String[0]));
-        }
         if (sslProviderString != null) {
             setProvider(sslProviderString);
         }
