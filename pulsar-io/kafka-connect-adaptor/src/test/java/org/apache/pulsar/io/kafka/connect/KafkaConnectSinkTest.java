@@ -68,9 +68,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -78,6 +75,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 @Slf4j
@@ -199,6 +200,8 @@ public class KafkaConnectSinkTest extends ProducerConsumerBase  {
 
         sink.write(record);
         sink.flush();
+
+        assertTrue(sink.currentOffset("persistent://a-b/c-d/fake-topic.a", 0) > 0L);
 
         assertEquals(status.get(), 1);
         assertEquals(resultCaptor.getResult().topic(), "persistent___a_b_c_d_fake_topic_a");
