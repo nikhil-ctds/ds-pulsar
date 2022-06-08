@@ -599,7 +599,7 @@ public class KafkaConnectSinkTest extends ProducerConsumerBase  {
         sink.write(record);
         sink.flush();
 
-        assertEquals("write should fail for unsupported schema",-1, status.get());
+        assertEquals(status.get(), -1, "write should fail for unsupported schema");
 
         sink.close();
     }
