@@ -38,6 +38,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException.NoMoreEntriesToReadE
 import org.apache.bookkeeper.mledger.ManagedLedgerException.TooManyRequestsException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.bookkeeper.mledger.util.SafeRun;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.delayed.DelayedDeliveryTracker;
 import org.apache.pulsar.broker.service.AbstractDispatcherMultipleConsumers;
@@ -206,7 +207,13 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
     }
 
     @Override
-    public synchronized void consumerFlow(Consumer consumer, int additionalNumberOfMessages) {
+    public void consumerFlow(Consumer consumer, int additionalNumberOfMessages) {
+        topic.getBrokerService().getTopicOrderedExecutor().executeOrdered(topic.getName(), SafeRun.safeRun(() -> {
+            internalConsumerFlow(consumer, additionalNumberOfMessages);
+        }));
+    }
+
+    private synchronized void internalConsumerFlow(Consumer consumer, int additionalNumberOfMessages) {
         if (!consumerSet.contains(consumer)) {
             if (log.isDebugEnabled()) {
                 log.debug("[{}] Ignoring flow control from disconnected consumer {}", name, consumer);
