@@ -52,6 +52,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import io.netty.channel.EventLoopGroup;
+import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
@@ -74,6 +75,7 @@ import org.apache.pulsar.common.protocol.Markers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -88,6 +90,7 @@ public class PersistentStickyKeyDispatcherMultipleConsumersTest {
     private PersistentSubscription subscriptionMock;
     private ServiceConfiguration configMock;
     private ChannelPromise channelMock;
+    private OrderedExecutor orderedExecutor;
 
     private PersistentStickyKeyDispatcherMultipleConsumers persistentDispatcher;
 
@@ -107,6 +110,9 @@ public class PersistentStickyKeyDispatcherMultipleConsumersTest {
 
         brokerMock = mock(BrokerService.class);
         doReturn(pulsarMock).when(brokerMock).pulsar();
+
+        orderedExecutor = OrderedExecutor.newBuilder().numThreads(1).build();
+        doReturn(orderedExecutor).when(brokerMock).getTopicOrderedExecutor();
 
         HierarchyTopicPolicies topicPolicies = new HierarchyTopicPolicies();
         topicPolicies.getMaxConsumersPerSubscription().updateBrokerValue(0);
@@ -153,6 +159,14 @@ public class PersistentStickyKeyDispatcherMultipleConsumersTest {
             persistentDispatcher = new PersistentStickyKeyDispatcherMultipleConsumers(
                     topicMock, cursorMock, subscriptionMock, configMock,
                     new KeySharedMeta().setKeySharedMode(KeySharedMode.AUTO_SPLIT));
+        }
+    }
+
+    @AfterMethod(alwaysRun = true)
+    public void shutDownExecutor() {
+        if (orderedExecutor != null) {
+            orderedExecutor.shutdownNow();
+            orderedExecutor = null;
         }
     }
 
