@@ -734,4 +734,8 @@ public interface ManagedCursor {
      * @return whether this cursor is closed.
      */
     boolean isClosed();
+
+    default void cacheEntry(Entry entry) {
+
+    }
 }

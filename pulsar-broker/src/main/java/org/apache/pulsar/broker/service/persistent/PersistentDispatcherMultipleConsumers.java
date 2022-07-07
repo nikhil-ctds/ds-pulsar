@@ -248,7 +248,6 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
                     log.debug("[{}] Schedule replay of {} messages for {} consumers", name, messagesToReplayNow.size(),
                             consumerList.size());
                 }
-
                 havePendingReplayRead = true;
                 minReplayedPosition = messagesToReplayNow.stream().min(PositionImpl::compareTo).orElse(null);
                 Set<? extends Position> deletedMessages = topic.isDelayedDeliveryEnabled()
@@ -629,6 +628,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
             }
             entries.subList(start, entries.size()).forEach(entry -> {
                 long stickyKeyHash = getStickyKeyHash(entry);
+                cursor.cacheEntry(entry);
                 addMessageToReplay(entry.getLedgerId(), entry.getEntryId(), stickyKeyHash);
                 entry.release();
             });

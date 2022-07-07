@@ -935,6 +935,10 @@ public class ManagedCursorImpl implements ManagedCursor {
         return state == State.Closed || state == State.Closing;
     }
 
+    public void cacheEntry(Entry entry) {
+        ledger.entryCache.insert((EntryImpl) entry);
+    }
+
     @Override
     public boolean cancelPendingReadRequest() {
         if (log.isDebugEnabled()) {
