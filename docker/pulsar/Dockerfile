@@ -59,7 +59,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
      && apt-get -y dist-upgrade \
      && apt-get install -y netcat dnsutils less procps iputils-ping \
                  python3 python3-dev python3-setuptools python3-yaml python3-kazoo \
-                 libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev \
+                 libreadline-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev \
                  curl vim net-tools unzip \
      && apt-get -y --purge autoremove \
      && apt-get autoclean \
