@@ -57,19 +57,22 @@ RUN adduser -u 10000 --gid 10001 --disabled-login --disabled-password --gecos ''
 # Install upgrades and some utilities
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
      && apt-get -y dist-upgrade \
-     && apt-get install -y netcat dnsutils less procps iputils-ping \
-                 python3 python3-dev python3-setuptools python3-yaml python3-kazoo \
-                 libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev \
+     && apt-get install -y software-properties-common netcat dnsutils less procps iputils-ping \
+                 libreadline-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev \
                  curl vim net-tools unzip \
+     && add-apt-repository -y ppa:deadsnakes/ppa \
+     && apt-get install -y python3.8 python3.8-dev python3.8-distutils python3-setuptools python3-yaml python3-kazoo \
      && apt-get -y --purge autoremove \
      && apt-get autoclean \
      && apt-get clean \
      && rm -rf /var/lib/apt/lists/*
 
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 10
+
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 RUN python3 get-pip.py
-
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
 # The pulsar directory is staged correctly in the first stage, above.
 # The chown and chmod ensure proper permissions for running as a non root user and non root group
