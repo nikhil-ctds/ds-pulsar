@@ -90,7 +90,7 @@ public abstract class JdbcAbstractSink<T> implements Sink<T> {
         }
 
         connection = DriverManager.getConnection(jdbcSinkConfig.getJdbcUrl(), properties);
-        connection.setAutoCommit(false);
+        connection.setAutoCommit(!jdbcSinkConfig.isUseTransactions());
         log.info("Opened jdbc connection: {}, autoCommit: {}", jdbcUrl, connection.getAutoCommit());
 
         tableName = jdbcSinkConfig.getTableName();
@@ -140,7 +140,7 @@ public abstract class JdbcAbstractSink<T> implements Sink<T> {
 
     @Override
     public void close() throws Exception {
-        if (connection != null && !connection.getAutoCommit()) {
+        if (connection != null && jdbcSinkConfig.isUseTransactions()) {
             connection.commit();
         }
         if (insertStatement != null) {
@@ -267,11 +267,20 @@ public abstract class JdbcAbstractSink<T> implements Sink<T> {
                             throw new IllegalArgumentException(msg);
                     }
                 }
-                connection.commit();
+                if (jdbcSinkConfig.isUseTransactions()) {
+                    connection.commit();
+                }
                 swapList.forEach(Record::ack);
             } catch (Exception e) {
                 log.error("Got exception ", e.getMessage(), e);
                 swapList.forEach(Record::fail);
+                try {
+                    if (jdbcSinkConfig.isUseTransactions()) {
+                        connection.rollback();
+                    }
+                } catch (Exception ex) {
+                    throw new RuntimeException(ex);
+                }
             }
 
             if (swapList.size() != count) {
