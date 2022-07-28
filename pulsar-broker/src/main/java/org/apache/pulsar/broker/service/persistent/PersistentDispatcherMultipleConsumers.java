@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntriesCallback;
 import org.apache.bookkeeper.mledger.Entry;
@@ -569,8 +568,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
         int entriesToDispatch = entries.size();
         // Trigger read more messages
         if (entriesToDispatch == 0) {
-            // sendMessagesToConsumers will always call readMoreEntries();
-            return false;
+            return true;
         }
         EntryWrapper[] entryWrappers = new EntryWrapper[entries.size()];
         int remainingMessages = updateEntryWrapperWithMetadata(entryWrappers, entries);
