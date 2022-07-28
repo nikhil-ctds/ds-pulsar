@@ -33,6 +33,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntriesCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -87,7 +89,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
     protected volatile PositionImpl minReplayedPosition = null;
     protected boolean shouldRewindBeforeReadingOrReplaying = false;
     protected final String name;
-    private boolean sendInProgress;
+    protected boolean sendInProgress;
     protected static final AtomicIntegerFieldUpdater<PersistentDispatcherMultipleConsumers>
             TOTAL_AVAILABLE_PERMITS_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(PersistentDispatcherMultipleConsumers.class,
@@ -497,7 +499,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
     }
 
     @Override
-    public synchronized void readEntriesComplete(List<Entry> entries, Object ctx) {
+    public synchronized final void readEntriesComplete(List<Entry> entries, Object ctx) {
         ReadType readType = (ReadType) ctx;
         if (readType == ReadType.Normal) {
             havePendingRead = false;
@@ -544,19 +546,22 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
 
     protected final synchronized void sendMessagesToConsumers(ReadType readType, List<Entry> entries) {
         sendInProgress = true;
+        boolean readMoreEntries;
         try {
-            trySendMessagesToConsumers(readType, entries);
+            readMoreEntries = trySendMessagesToConsumers(readType, entries);
         } finally {
             sendInProgress = false;
         }
-        readMoreEntries();
+        if (readMoreEntries) {
+            readMoreEntries();
+        }
     }
 
     /*
      * This method is overridden by other classes, please take a look to other implementations
      * if you need to change it.
      */
-    protected synchronized void trySendMessagesToConsumers(ReadType readType, List<Entry> entries) {
+    protected synchronized boolean trySendMessagesToConsumers(ReadType readType, List<Entry> entries) {
         if (needTrimAckedMessages()) {
             cursor.trimDeletedEntries(entries);
         }
@@ -565,7 +570,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
         // Trigger read more messages
         if (entriesToDispatch == 0) {
             // sendMessagesToConsumers will always call readMoreEntries();
-            return;
+            return false;
         }
         EntryWrapper[] entryWrappers = new EntryWrapper[entries.size()];
         int remainingMessages = updateEntryWrapperWithMetadata(entryWrappers, entries);
@@ -590,7 +595,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
                 log.info("[{}] rewind because no available consumer found from total {}", name, consumerList.size());
                 entries.subList(start, entries.size()).forEach(Entry::release);
                 cursor.rewind();
-                return;
+                return false;
             }
 
             // round-robin dispatch batch size for this consumer
@@ -675,6 +680,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
                 entry.release();
             });
         }
+        return true;
     }
 
     @Override
