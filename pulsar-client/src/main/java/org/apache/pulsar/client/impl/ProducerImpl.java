@@ -565,6 +565,7 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
                 .setTotalChunkMsgSize(compressedPayloadSize);
         }
         if (!msgMetadata.hasPublishTime()) {
+            // log.info("got publish time: " + client.getClientClock().millis());
             msgMetadata.setPublishTime(client.getClientClock().millis());
 
             checkArgument(!msgMetadata.hasProducerName());
