@@ -536,6 +536,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
 
             offloadersCache.close();
 
+
             if (transactionBufferClient != null) {
                 transactionBufferClient.close();
             }

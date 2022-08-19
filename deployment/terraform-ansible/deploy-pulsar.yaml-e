@@ -155,7 +155,7 @@
 #        - jdbc-postgres
 #        - jdbc-sqlite
 #        - http
-        - kafka
+#        - kafka
 #        - kafka-connect-adaptor
 #        - kinesis
 #        - mongo
