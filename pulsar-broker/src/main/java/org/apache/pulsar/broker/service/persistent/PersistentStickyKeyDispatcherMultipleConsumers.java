@@ -197,7 +197,7 @@ public class PersistentStickyKeyDispatcherMultipleConsumers extends PersistentDi
                                 addMessageToReplay(entry.getLedgerId(), entry.getEntryId(), stickyKeyHash);
                                 entry.release();
                             });
-                        } else if (readType == ReadType.Replay) {
+                        } else if (readType.isReplay()) {
                             entries.forEach(Entry::release);
                         }
                         return true;
@@ -272,7 +272,7 @@ public class PersistentStickyKeyDispatcherMultipleConsumers extends PersistentDi
                 EntryBatchSizes batchSizes = EntryBatchSizes.get(messagesForC);
                 EntryBatchIndexesAcks batchIndexesAcks = EntryBatchIndexesAcks.get(messagesForC);
                 totalEntries += filterEntriesForConsumer(entriesWithSameKey, batchSizes, sendMessageInfo,
-                        batchIndexesAcks, cursor, readType == ReadType.Replay, consumer);
+                        batchIndexesAcks, cursor, readType.isReplay(), consumer);
 
                 consumer.sendMessages(entriesWithSameKey, batchSizes, batchIndexesAcks,
                         sendMessageInfo.getTotalMessages(),
@@ -387,7 +387,7 @@ public class PersistentStickyKeyDispatcherMultipleConsumers extends PersistentDi
         // so the message [2,3] will dispatched to the consumer2
         // But the message [2,3] should not dispatch to consumer2.
 
-        if (readType == ReadType.Replay) {
+        if (readType.isReplay()) {
             PositionImpl minReadPositionForRecentJoinedConsumer = recentlyJoinedConsumers.values().iterator().next();
             if (minReadPositionForRecentJoinedConsumer != null
                     && minReadPositionForRecentJoinedConsumer.compareTo(maxReadPosition) < 0) {
@@ -462,8 +462,8 @@ public class PersistentStickyKeyDispatcherMultipleConsumers extends PersistentDi
     }
 
     @Override
-    protected Set<? extends Position> asyncReplayEntries(Set<? extends Position> positions) {
-        return cursor.asyncReplayEntries(positions, this, ReadType.Replay, true);
+    protected Set<? extends Position> asyncReplayEntries(Set<? extends Position> positions, ReadType readType) {
+        return cursor.asyncReplayEntries(positions, this, readType, true);
     }
 
     public KeySharedMode getKeySharedMode() {

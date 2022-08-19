@@ -114,7 +114,11 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
     protected final ExecutorService dispatchMessagesThread;
 
     protected enum ReadType {
-        Normal, Replay
+        Normal, Replay, ReplayDelayed;
+
+        boolean isReplay() {
+            return this == Replay || this == ReplayDelayed;
+        }
     }
 
     public PersistentDispatcherMultipleConsumers(PersistentTopic topic, ManagedCursor cursor,
@@ -271,6 +275,11 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
             }
 
             Set<PositionImpl> messagesToReplayNow = getMessagesToReplayNow(messagesToRead);
+            ReadType readType = ReadType.Replay;
+            if (messagesToReplayNow.isEmpty()) {
+                messagesToReplayNow = getDelayedMessagesToReplayNow(messagesToRead);
+                readType = ReadType.ReplayDelayed;
+            }
 
             if (!messagesToReplayNow.isEmpty()) {
                 if (log.isDebugEnabled()) {
@@ -281,7 +290,8 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
                 havePendingReplayRead = true;
                 minReplayedPosition = messagesToReplayNow.stream().min(PositionImpl::compareTo).orElse(null);
                 Set<? extends Position> deletedMessages = topic.isDelayedDeliveryEnabled()
-                        ? asyncReplayEntriesInOrder(messagesToReplayNow) : asyncReplayEntries(messagesToReplayNow);
+                        ? asyncReplayEntriesInOrder(messagesToReplayNow, readType)
+                        : asyncReplayEntries(messagesToReplayNow, readType);
                 // clear already acked positions from replay bucket
 
                 deletedMessages.forEach(position -> redeliveryMessages.remove(((PositionImpl) position).getLedgerId(),
@@ -424,12 +434,12 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
         return Pair.of(messagesToRead, bytesToRead);
     }
 
-    protected Set<? extends Position> asyncReplayEntries(Set<? extends Position> positions) {
-        return cursor.asyncReplayEntries(positions, this, ReadType.Replay);
+    protected Set<? extends Position> asyncReplayEntries(Set<? extends Position> positions, ReadType readType) {
+        return cursor.asyncReplayEntries(positions, this, readType);
     }
 
-    protected Set<? extends Position> asyncReplayEntriesInOrder(Set<? extends Position> positions) {
-        return cursor.asyncReplayEntries(positions, this, ReadType.Replay, true);
+    protected Set<? extends Position> asyncReplayEntriesInOrder(Set<? extends Position> positions, ReadType readType) {
+        return cursor.asyncReplayEntries(positions, this, readType, true);
     }
 
     @Override
@@ -641,7 +651,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
             EntryBatchIndexesAcks batchIndexesAcks = EntryBatchIndexesAcks.get(entriesForThisConsumer.size());
             totalEntries += filterEntriesForConsumer(Optional.empty(), start,
                     entriesForThisConsumer, batchSizes, sendMessageInfo, batchIndexesAcks, cursor,
-                    readType == ReadType.Replay, c);
+                    readType.isReplay(), c);
 
             c.sendMessages(entriesForThisConsumer, batchSizes, batchIndexesAcks, sendMessageInfo.getTotalMessages(),
                     sendMessageInfo.getTotalBytes(), sendMessageInfo.getTotalChunkedMessages(), redeliveryTracker);
@@ -947,7 +957,13 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
     protected synchronized Set<PositionImpl> getMessagesToReplayNow(int maxMessagesToRead) {
         if (!redeliveryMessages.isEmpty()) {
             return redeliveryMessages.getMessagesToReplayNow(maxMessagesToRead);
-        } else if (delayedDeliveryTracker.isPresent() && delayedDeliveryTracker.get().hasMessageAvailable()) {
+        }
+        return Collections.emptySet();
+
+    }
+
+    protected synchronized Set<PositionImpl> getDelayedMessagesToReplayNow(int maxMessagesToRead) {
+        if (delayedDeliveryTracker.isPresent() && delayedDeliveryTracker.get().hasMessageAvailable()) {
             delayedDeliveryTracker.get().resetTickTime(topic.getDelayedDeliveryTickTimeMillis());
             return delayedDeliveryTracker.get().getScheduledMessages(maxMessagesToRead);
         } else {

@@ -167,6 +167,11 @@ public class PersistentStreamingDispatcherMultipleConsumers extends PersistentDi
             }
 
             Set<PositionImpl> messagesToReplayNow = getMessagesToReplayNow(messagesToRead);
+            ReadType readType = ReadType.Replay;
+            if (messagesToReplayNow.isEmpty()) {
+                messagesToReplayNow = getDelayedMessagesToReplayNow(messagesToRead);
+                readType = ReadType.ReplayDelayed;
+            }
 
             if (!messagesToReplayNow.isEmpty()) {
                 if (log.isDebugEnabled()) {
@@ -176,7 +181,8 @@ public class PersistentStreamingDispatcherMultipleConsumers extends PersistentDi
 
                 havePendingReplayRead = true;
                 Set<? extends Position> deletedMessages = topic.isDelayedDeliveryEnabled()
-                        ? asyncReplayEntriesInOrder(messagesToReplayNow) : asyncReplayEntries(messagesToReplayNow);
+                        ? asyncReplayEntriesInOrder(messagesToReplayNow, readType) :
+                        asyncReplayEntries(messagesToReplayNow, readType);
                 // clear already acked positions from replay bucket
 
                 deletedMessages.forEach(position -> redeliveryMessages.remove(((PositionImpl) position).getLedgerId(),
