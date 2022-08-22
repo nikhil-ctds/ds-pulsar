@@ -166,10 +166,9 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
     protected final NavigableMap<Long, LedgerInfo> ledgers = new ConcurrentSkipListMap<>();
     private volatile Stat ledgersStat;
 
-    private final ManagedCursorContainer cursors = new ManagedCursorContainer();
-    private final ManagedCursorContainer activeCursors = new ManagedCursorContainer();
-    private final ManagedCursorContainer nonDurableActiveCursors =
-            new ManagedCursorContainer(ManagedCursorContainer.CursorType.NonDurableCursor);
+    private final ManagedCursorContainer cursors;
+    private final ManagedCursorContainer activeCursors;
+    private final ManagedCursorContainer nonDurableActiveCursors;
 
     // Ever increasing counter of entries added
     @VisibleForTesting
@@ -315,6 +314,14 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
     public ManagedLedgerImpl(ManagedLedgerFactoryImpl factory, BookKeeper bookKeeper, MetaStore store,
             ManagedLedgerConfig config, OrderedScheduler scheduledExecutor,
             final String name, final Supplier<Boolean> mlOwnershipChecker) {
+        this.cursors = new ManagedCursorContainer(ManagedCursorContainer.CursorType.DurableCursor,
+                config.isCacheEvictionByMarkDeletedPosition());
+        this.activeCursors = new ManagedCursorContainer(ManagedCursorContainer.CursorType.DurableCursor,
+                config.isCacheEvictionByMarkDeletedPosition());
+        this.nonDurableActiveCursors =
+                new ManagedCursorContainer(ManagedCursorContainer.CursorType.NonDurableCursor,
+                        config.isCacheEvictionByMarkDeletedPosition());
+
         this.factory = factory;
         this.bookKeeper = bookKeeper;
         this.config = config;

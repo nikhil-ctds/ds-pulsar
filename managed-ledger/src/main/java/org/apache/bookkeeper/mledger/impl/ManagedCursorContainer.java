@@ -51,10 +51,10 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
         PositionImpl position;
         int idx;
 
-        Item(ManagedCursor cursor, int idx) {
+        Item(ManagedCursor cursor, int idx, PositionImpl position) {
             this.cursor = cursor;
-            this.position = (PositionImpl) cursor.getMarkDeletedPosition();
             this.idx = idx;
+            this.position = position;
         }
     }
 
@@ -65,14 +65,16 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
     }
 
     public ManagedCursorContainer() {
-        cursorType = CursorType.DurableCursor;
+        this(CursorType.DurableCursor, false);
     }
 
-    public ManagedCursorContainer(CursorType cursorType) {
+    public ManagedCursorContainer(CursorType cursorType, boolean cacheEvictionByLastDeleteMarkPosition) {
+        this.cacheEvictionByLastDeleteMarkPosition = true;
         this.cursorType = cursorType;
     }
 
     private final CursorType cursorType;
+    private final boolean cacheEvictionByLastDeleteMarkPosition;
 
     // Used to keep track of slowest cursor. Contains all of all active cursors.
     private final ArrayList<Item> heap = Lists.newArrayList();
@@ -86,7 +88,9 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
         long stamp = rwLock.writeLock();
         try {
             // Append a new entry at the end of the list
-            Item item = new Item(cursor, heap.size());
+            PositionImpl position = cacheEvictionByLastDeleteMarkPosition ? (PositionImpl) cursor.getMarkDeletedPosition()
+                    : (PositionImpl) cursor.getReadPosition();
+            Item item = new Item(cursor, heap.size(), position);
             cursors.put(cursor.getName(), item);
 
             if (shouldTrackInHeap(cursor)) {

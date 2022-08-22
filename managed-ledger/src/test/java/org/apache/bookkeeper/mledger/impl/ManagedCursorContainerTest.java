@@ -401,7 +401,7 @@ public class ManagedCursorContainerTest {
     @Test
     public void testSlowestReadPositionForActiveCursors() throws Exception {
         ManagedCursorContainer container =
-                new ManagedCursorContainer(ManagedCursorContainer.CursorType.NonDurableCursor);
+                new ManagedCursorContainer(ManagedCursorContainer.CursorType.NonDurableCursor, false);
         assertNull(container.getSlowestReadPositionForActiveCursors());
 
         // Add no durable cursor
