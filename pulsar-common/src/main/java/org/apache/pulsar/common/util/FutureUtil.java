@@ -34,7 +34,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * This class is aimed at simplifying work with {@code CompletableFuture}.
+ * This class is aimed at simplifying work wit {@code CompletableFuture}.
  */
 public class FutureUtil {
 
