@@ -46,33 +46,48 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public class ManagedCursorContainer implements Iterable<ManagedCursor> {
 
+    private final OrderingType orderingType;
+    private final OrderingFilter orderingFilter;
+
     private static class Item {
         final ManagedCursor cursor;
         PositionImpl position;
         int idx;
 
-        Item(ManagedCursor cursor, int idx) {
+        Item(ManagedCursor cursor, PositionImpl position, int idx) {
             this.cursor = cursor;
-            this.position = (PositionImpl) cursor.getMarkDeletedPosition();
+            this.position = position;
             this.idx = idx;
         }
     }
 
-    public enum CursorType {
-        DurableCursor,
-        NonDurableCursor,
-        ALL
+    private enum OrderingType {
+        MARKDELETED_POSITION,
+        READ_POSITION
     }
 
-    public ManagedCursorContainer() {
-        cursorType = CursorType.DurableCursor;
+    private enum OrderingFilter {
+        ALL_CURSORS,
+        DURABLE_CURSORS
     }
 
-    public ManagedCursorContainer(CursorType cursorType) {
-        this.cursorType = cursorType;
+
+    private ManagedCursorContainer(OrderingType orderingType, OrderingFilter orderingFilter) {
+        this.orderingType = orderingType;
+        this.orderingFilter = orderingFilter;
     }
 
-    private final CursorType cursorType;
+    public static ManagedCursorContainer createWithDurableOrderedByMarkDeletedPosition() {
+        return new ManagedCursorContainer(OrderingType.MARKDELETED_POSITION, OrderingFilter.DURABLE_CURSORS);
+    }
+
+    public static ManagedCursorContainer createWithAllOrderedByMarkDeletedPosition() {
+        return new ManagedCursorContainer(OrderingType.MARKDELETED_POSITION, OrderingFilter.ALL_CURSORS);
+    }
+
+    public static ManagedCursorContainer createWithAllOrderedByReadPosition() {
+        return new ManagedCursorContainer(OrderingType.READ_POSITION, OrderingFilter.ALL_CURSORS);
+    }
 
     // Used to keep track of slowest cursor. Contains all of all active cursors.
     private final ArrayList<Item> heap = Lists.newArrayList();
@@ -82,43 +97,39 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
 
     private final StampedLock rwLock = new StampedLock();
 
+    private int durableCursorCount;
+
+
     public void add(ManagedCursor cursor) {
         long stamp = rwLock.writeLock();
         try {
-            // Append a new entry at the end of the list
-            Item item = new Item(cursor, heap.size());
+            boolean trackOrderOfCursor = shouldTrackOrderOfCursor(cursor);
+            Item item = new Item(cursor, resolvePosition(cursor), trackOrderOfCursor ? heap.size() : -1);
             cursors.put(cursor.getName(), item);
-
-            if (shouldTrackInHeap(cursor)) {
+            if (trackOrderOfCursor) {
                 heap.add(item);
                 siftUp(item);
+            }
+            if (cursor.isDurable()) {
+                durableCursorCount++;
             }
         } finally {
             rwLock.unlockWrite(stamp);
         }
     }
 
-    private boolean shouldTrackInHeap(ManagedCursor cursor) {
-        return CursorType.ALL.equals(cursorType)
-                || (cursor.isDurable() && CursorType.DurableCursor.equals(cursorType))
-                || (!cursor.isDurable() && CursorType.NonDurableCursor.equals(cursorType));
+    private boolean shouldTrackOrderOfCursor(ManagedCursor cursor) {
+        return orderingFilter == OrderingFilter.ALL_CURSORS
+                || orderingFilter == OrderingFilter.DURABLE_CURSORS && cursor.isDurable();
     }
 
-    public PositionImpl getSlowestReadPositionForActiveCursors() {
-        long stamp = rwLock.readLock();
-        try {
-            return heap.isEmpty() ? null : (PositionImpl) heap.get(0).cursor.getReadPosition();
-        } finally {
-            rwLock.unlockRead(stamp);
-        }
-    }
-
-    public PositionImpl getSlowestMarkDeletedPositionForActiveCursors() {
-        long stamp = rwLock.readLock();
-        try {
-            return heap.isEmpty() ? null : (PositionImpl) heap.get(0).cursor.getMarkDeletedPosition();
-        } finally {
-            rwLock.unlockRead(stamp);
+    private PositionImpl resolvePosition(ManagedCursor cursor) {
+        if (orderingType == OrderingType.MARKDELETED_POSITION) {
+            return (PositionImpl) cursor.getMarkDeletedPosition();
+        } else if (orderingType == OrderingType.READ_POSITION) {
+            return (PositionImpl) cursor.getReadPosition();
+        } else {
+            throw new IllegalStateException("Unknown orderingType=" + orderingType);
         }
     }
 
@@ -136,13 +147,18 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
         long stamp = rwLock.writeLock();
         try {
             Item item = cursors.remove(name);
-            if (item != null && shouldTrackInHeap(item.cursor)) {
-                // Move the item to the right end of the heap to be removed
-                Item lastItem = heap.get(heap.size() - 1);
-                swap(item, lastItem);
-                heap.remove(item.idx);
-                // Update the heap
-                siftDown(lastItem);
+            if (item != null) {
+                if (shouldTrackOrderOfCursor(item.cursor)) {
+                    // Move the item to the right end of the heap to be removed
+                    Item lastItem = heap.get(heap.size() - 1);
+                    swap(item, lastItem);
+                    heap.remove(item.idx);
+                    // Update the heap
+                    siftDown(lastItem);
+                }
+                if (item.cursor.isDurable()) {
+                    durableCursorCount--;
+                }
             }
         } finally {
             rwLock.unlockWrite(stamp);
@@ -161,29 +177,31 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
 
         long stamp = rwLock.writeLock();
         try {
+            if (!shouldTrackOrderOfCursor(cursor) || heap.isEmpty()) {
+                return null;
+            }
+
             Item item = cursors.get(cursor.getName());
             if (item == null) {
                 return null;
             }
 
+            PositionImpl previousSlowestConsumer = heap.get(0).position;
 
-            if (shouldTrackInHeap(item.cursor)) {
-                PositionImpl previousSlowestConsumer = heap.get(0).position;
-
+            item.position = (PositionImpl) newPosition;
+            if (heap.size() > 1) {
                 // When the cursor moves forward, we need to push it toward the
                 // bottom of the tree and push it up if a reset was done
 
-                item.position = (PositionImpl) newPosition;
                 if (item.idx == 0 || getParent(item).position.compareTo(item.position) <= 0) {
                     siftDown(item);
                 } else {
                     siftUp(item);
                 }
-
-                PositionImpl newSlowestConsumer = heap.get(0).position;
-                return Pair.of(previousSlowestConsumer, newSlowestConsumer);
             }
-            return null;
+
+            PositionImpl newSlowestConsumer = heap.get(0).position;
+            return Pair.of(previousSlowestConsumer, newSlowestConsumer);
         } finally {
             rwLock.unlockWrite(stamp);
         }
@@ -238,18 +256,18 @@ public class ManagedCursorContainer implements Iterable<ManagedCursor> {
      */
     public boolean hasDurableCursors() {
         long stamp = rwLock.tryOptimisticRead();
-        boolean isEmpty = heap.isEmpty();
+        int count = durableCursorCount;
         if (!rwLock.validate(stamp)) {
             // Fallback to read lock
             stamp = rwLock.readLock();
             try {
-                isEmpty = heap.isEmpty();
+                count = durableCursorCount;
             } finally {
                 rwLock.unlockRead(stamp);
             }
         }
 
-        return !isEmpty;
+        return count > 0;
     }
 
     @Override
