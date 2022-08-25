@@ -340,7 +340,7 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
         }
 
         // THEN it is expected that the cache evicts entries to the earliest read position
-        Thread.sleep(2 * factory.getConfig().getCacheEvictionIntervalMs());
+        Thread.sleep((long) (2 * (1000 / factory.getConfig().getCacheEvictionFrequency())));
         int evictedEntriesCount =
                 (int) cacheStats.getCacheEvictedEntriesCount() - evictedEntriesCountBefore;
         assertEquals(evictedEntriesCount, 11,
@@ -397,7 +397,7 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
             entries.forEach(Entry::release);
         }
 
-        Thread.sleep(1000 + 2 * factory.getConfig().getCacheEvictionIntervalMs());
+        Thread.sleep(1000 + (long) (2 * (1000 / factory.getConfig().getCacheEvictionFrequency())));
 
         ManagedCursorContainer activeCursors = (ManagedCursorContainer) ledger.getActiveCursors();
         assertEquals(activeCursors.getSlowestReaderPosition(), lastMarkDeletePos);
