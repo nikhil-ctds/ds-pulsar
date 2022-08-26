@@ -43,7 +43,9 @@ public class ServiceConfigurationUtils {
     public static String unsafeLocalhostResolve() {
         try {
             // Get the fully qualified hostname
-            return InetAddress.getLocalHost().getCanonicalHostName();
+            String result =  InetAddress.getLocalHost().getCanonicalHostName();
+            LOG.info("unsafeLocalhostResolve -> {}", result);
+            return result;
         } catch (UnknownHostException ex) {
             LOG.error(ex.getMessage(), ex);
             throw new IllegalStateException("Failed to resolve localhost name.", ex);
