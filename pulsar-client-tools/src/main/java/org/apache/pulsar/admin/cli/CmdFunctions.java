@@ -1191,6 +1191,15 @@ public class CmdFunctions extends CmdBase {
         }
     }
 
+    @Parameters(commandDescription = "Reload the available built-in functions")
+    public class ReloadBuiltInFunctions extends CmdFunctions.BaseCommand {
+
+        @Override
+        void runCmd() throws Exception {
+            getAdmin().functions().reloadBuiltInFunctions();
+        }
+    }
+
     public CmdFunctions(Supplier<PulsarAdmin> admin) throws PulsarClientException {
         super("functions", admin);
         localRunner = new LocalRunner();
@@ -1226,6 +1235,7 @@ public class CmdFunctions extends CmdBase {
         jcommander.addCommand("trigger", getTriggerer());
         jcommander.addCommand("upload", getUploader());
         jcommander.addCommand("download", getDownloader());
+        jcommander.addCommand("reload", new ReloadBuiltInFunctions());
     }
 
     @VisibleForTesting
