@@ -42,6 +42,7 @@ import org.apache.bookkeeper.client.api.LedgerEntry;
 import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntriesCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
+import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
@@ -57,6 +58,16 @@ import org.slf4j.LoggerFactory;
  */
 public class RangeEntryCacheImpl implements EntryCache {
 
+    private static final Counter COUNT_ENTRIES_READ_FROM_BK = Counter
+            .build()
+            .name("pulsar_ml_cache_pendingreads_entries_read")
+            .help("Total number of entries read from BK")
+            .register();
+    private static final Counter COUNT_ENTRIES_NOTREAD_FROM_BK = Counter
+            .build()
+            .name("pulsar_ml_cache_pendingreads_entries_notread")
+            .help("Total number of entries not read from BK")
+            .register();
     private static final Counter COUNT_PENDING_READS_MATCHED = Counter
             .build()
             .name("pulsar_ml_cache_pendingreads_matched")
@@ -72,9 +83,22 @@ public class RangeEntryCacheImpl implements EntryCache {
             .name("pulsar_ml_cache_pendingreads_missed")
             .help("Pending reads that didn't find a match")
             .register();
-    private static final Counter COUNT_PENDING_READS_MISSED_BUT_OVERLAPPING = Counter
+
+    private static final Counter COUNT_PENDING_READS_MATCHED_OVERLAPPING_MISS_LEFT = Counter
             .build()
-            .name("pulsar_ml_cache_pendingreads_missed_overlapping")
+            .name("pulsar_ml_cache_pendingreads_matched_overlapping_miss_left")
+            .help("Pending reads that didn't find a match but they partially overlap with another read")
+            .register();
+
+    private static final Counter COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_RIGHT = Counter
+            .build()
+            .name("pulsar_ml_cache_pendingreads_matched_overlapping_miss_right")
+            .help("Pending reads that didn't find a match but they partially overlap with another read")
+            .register();
+
+    private static final Counter COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_BOTH = Counter
+            .build()
+            .name("pulsar_ml_cache_pendingreads_matched_overlapping_miss_both")
             .help("Pending reads that didn't find a match but they partially overlap with another read")
             .register();
 
@@ -99,6 +123,9 @@ public class RangeEntryCacheImpl implements EntryCache {
     private static class PendingReadKey {
         private final long startEntry;
         private final long endEntry;
+        long size() {
+            return endEntry - startEntry + 1;
+        }
 
 
         boolean includes(PendingReadKey other) {
@@ -108,6 +135,26 @@ public class RangeEntryCacheImpl implements EntryCache {
         boolean overlaps(PendingReadKey other) {
             return (other.startEntry <= startEntry && startEntry <= other.endEntry)
                     || (other.startEntry <= endEntry && endEntry <= other.endEntry);
+        }
+
+        PendingReadKey reminderOnLeft(PendingReadKey other) {
+            //   S******-----E
+            //          S----------E
+            if (other.startEntry <= endEntry && endEntry <= other.endEntry
+                     && other.startEntry > startEntry) {
+                return new PendingReadKey(startEntry, other.startEntry - 1);
+            }
+            return null;
+        }
+
+        PendingReadKey reminderOnRight(PendingReadKey other) {
+            //          S-----*******E
+            //   S-----------E
+            if (other.startEntry <= startEntry && startEntry <= other.endEntry
+                    && other.endEntry < endEntry) {
+                return new PendingReadKey(other.endEntry + 1, endEntry);
+            }
+            return null;
         }
 
     }
@@ -321,34 +368,81 @@ public class RangeEntryCacheImpl implements EntryCache {
         final long endEntry;
     }
 
-    private CachedPendingRead findBestCandidate(PendingReadKey key, Map<PendingReadKey, CachedPendingRead> ledgerCache,
-                                                AtomicBoolean created) {
+    @AllArgsConstructor
+    private static final class FindCachedPendingReadOutcome {
+        final CachedPendingRead cachedPendingRead;
+        final PendingReadKey missingOnLeft;
+        final PendingReadKey missingOnRight;
+        boolean needsAdditionalReads() {
+            return missingOnLeft != null || missingOnRight != null;
+        }
+    }
+
+    private FindCachedPendingReadOutcome findBestCandidate(PendingReadKey key, Map<PendingReadKey,
+            CachedPendingRead> ledgerCache,
+            AtomicBoolean created) {
         synchronized (ledgerCache) {
             CachedPendingRead existing = ledgerCache.get(key);
             if (existing != null) {
-                COUNT_PENDING_READS_MATCHED.inc();
-                return existing;
+                COUNT_PENDING_READS_MATCHED.inc(key.size());
+                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(key.size());
+                return new FindCachedPendingReadOutcome(existing, null, null);
             }
-            boolean someOverlappingButNotUsable = false;
-            for (Map.Entry<PendingReadKey, CachedPendingRead> entry : ledgerCache.entrySet()) {
-                if (entry.getKey().includes(key)) {
-                    COUNT_PENDING_READS_MATCHED_INCLUDED.inc();
-                    return entry.getValue();
-                }
+            FindCachedPendingReadOutcome foundButMissingSomethingOnLeft = null;
+            FindCachedPendingReadOutcome foundButMissingSomethingOnRight = null;
+            FindCachedPendingReadOutcome foundButMissingSomethingOnBoth = null;
 
-                if (entry.getKey().overlaps(key)) {
-                    someOverlappingButNotUsable = true;
+            for (Map.Entry<PendingReadKey, CachedPendingRead> entry : ledgerCache.entrySet()) {
+                PendingReadKey entryKey = entry.getKey();
+                if (entryKey.includes(key)) {
+                    COUNT_PENDING_READS_MATCHED_INCLUDED.inc(key.size());
+                    COUNT_ENTRIES_NOTREAD_FROM_BK.inc(key.size());
+                    return new FindCachedPendingReadOutcome(entry.getValue(), null, null);
+                }
+                if (entryKey.overlaps(key)) {
+                    PendingReadKey reminderOnLeft = key.reminderOnLeft(entryKey);
+                    PendingReadKey reminderOnRight = key.reminderOnRight(entryKey);
+                    if (reminderOnLeft != null && reminderOnRight != null) {
+                        foundButMissingSomethingOnBoth = new FindCachedPendingReadOutcome(entry.getValue(),
+                                reminderOnLeft, reminderOnRight);
+                    } else if (reminderOnLeft != null && reminderOnRight == null) {
+                        foundButMissingSomethingOnLeft = new FindCachedPendingReadOutcome(entry.getValue(),
+                                reminderOnLeft, null);
+                    } else if (reminderOnRight != null && reminderOnLeft == null) {
+                        foundButMissingSomethingOnRight = new FindCachedPendingReadOutcome(entry.getValue(),
+                                null, reminderOnRight);
+                    }
                 }
             }
+
+            if (foundButMissingSomethingOnLeft != null) {
+                long delta = key.size()
+                        - foundButMissingSomethingOnLeft.missingOnLeft.size();
+                COUNT_PENDING_READS_MATCHED_OVERLAPPING_MISS_LEFT.inc(delta);
+                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(delta);
+                return foundButMissingSomethingOnLeft;
+            } else if (foundButMissingSomethingOnRight != null) {
+                long delta = key.size()
+                        - foundButMissingSomethingOnRight.missingOnRight.size();
+                COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_RIGHT.inc(delta);
+                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(delta);
+                return foundButMissingSomethingOnRight;
+            } else if (foundButMissingSomethingOnBoth != null) {
+                long delta = key.size()
+                        - foundButMissingSomethingOnBoth.missingOnRight.size()
+                        - foundButMissingSomethingOnBoth.missingOnLeft.size();
+                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(delta);
+                COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_BOTH.inc(delta);
+                return foundButMissingSomethingOnBoth;
+            }
+
             created.set(true);
             CachedPendingRead newRead = new CachedPendingRead(key, ledgerCache);
             ledgerCache.put(key, newRead);
-            if (someOverlappingButNotUsable) {
-                COUNT_PENDING_READS_MISSED_BUT_OVERLAPPING.inc();
-            } else {
-                COUNT_PENDING_READS_MISSED.inc();
-            }
-            return newRead;
+            long delta = key.size();
+            COUNT_PENDING_READS_MISSED.inc(delta);
+            COUNT_ENTRIES_READ_FROM_BK.inc(delta);
+            return new FindCachedPendingReadOutcome(newRead, null, null);
         }
     }
 
@@ -407,9 +501,9 @@ public class RangeEntryCacheImpl implements EntryCache {
                         }
                     } else {
                         for (ReadEntriesCallbackWithContext callback : callbacks) {
-                            List<EntryImpl> copy = new ArrayList<>(entriesToReturn.size());
                             long callbackStartEntry = callback.startEntry;
                             long callbackEndEntry = callback.endEntry;
+                            List<EntryImpl> copy = new ArrayList<>((int) (callbackEndEntry - callbackEndEntry + 1));
                             for (EntryImpl entry : entriesToReturn) {
                                 long entryId = entry.getEntryId();
                                 if (callbackStartEntry <= entryId && entryId <= callbackEndEntry) {
@@ -427,13 +521,8 @@ public class RangeEntryCacheImpl implements EntryCache {
             }, ml.getExecutor().chooseThread(ml.getName())).exceptionally(exception -> {
                 synchronized (CachedPendingRead.this) {
                     for (ReadEntriesCallbackWithContext callback : callbacks) {
-                        if (exception instanceof BKException
-                                && ((BKException) exception).getCode() == BKException.Code.TooManyRequestsException) {
-                            callback.callback.readEntriesFailed(createManagedLedgerException(exception), callback.ctx);
-                        } else {
-                            ManagedLedgerException mlException = createManagedLedgerException(exception);
-                            callback.callback.readEntriesFailed(mlException, callback.ctx);
-                        }
+                        ManagedLedgerException mlException = createManagedLedgerException(exception);
+                        callback.callback.readEntriesFailed(mlException, callback.ctx);
                     }
                 }
                 return null;
@@ -497,9 +586,106 @@ public class RangeEntryCacheImpl implements EntryCache {
             boolean listenerAdded = false;
             while (!listenerAdded) {
                 AtomicBoolean createdByThisThread = new AtomicBoolean();
-                CachedPendingRead cachedPendingRead = findBestCandidate(key,
+                FindCachedPendingReadOutcome findBestCandidateOutcome = findBestCandidate(key,
                         pendingReadsForLedger, createdByThisThread);
-                listenerAdded = cachedPendingRead.addListener(callback, ctx, key.startEntry, key.endEntry);
+                CachedPendingRead cachedPendingRead = findBestCandidateOutcome.cachedPendingRead;
+                if (findBestCandidateOutcome.needsAdditionalReads()) {
+                    ReadEntriesCallback wrappedCallback = new ReadEntriesCallback() {
+                        @Override
+                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                            PendingReadKey missingOnLeft = findBestCandidateOutcome.missingOnLeft;
+                            PendingReadKey missingOnRight = findBestCandidateOutcome.missingOnRight;
+                            if (missingOnRight != null && missingOnLeft != null) {
+                                ReadEntriesCallback readFromLeftCallback = new ReadEntriesCallback() {
+                                    @Override
+                                    public void readEntriesComplete(List<Entry> entriesFromLeft, Object dummyCtx1) {
+                                        ReadEntriesCallback readFromRightCallback = new ReadEntriesCallback() {
+                                            @Override
+                                            public void readEntriesComplete(List<Entry> entriesFromRight,
+                                                                            Object dummyCtx2) {
+                                                List<Entry> finalResult =
+                                                        new ArrayList<>(entriesFromLeft.size()
+                                                            + entries.size() + entriesFromRight.size());
+                                                finalResult.addAll(entriesFromLeft);
+                                                finalResult.addAll(entries);
+                                                finalResult.addAll(entriesFromRight);
+                                                callback.readEntriesComplete(finalResult, ctx);
+                                            }
+
+                                            @Override
+                                            public void readEntriesFailed(ManagedLedgerException exception,
+                                                                          Object dummyCtx3) {
+                                                callback.readEntriesFailed(exception, ctx);
+                                            }
+                                        };
+                                        asyncReadEntry0(lh, missingOnRight.startEntry, missingOnRight.endEntry,
+                                                shouldCacheEntry, readFromRightCallback, null);
+                                    }
+
+                                    @Override
+                                    public void readEntriesFailed(ManagedLedgerException exception, Object dummyCtx4) {
+                                        callback.readEntriesFailed(exception, ctx);
+                                    }
+                                };
+                                asyncReadEntry0(lh, missingOnLeft.startEntry, missingOnLeft.endEntry,
+                                        shouldCacheEntry, readFromLeftCallback, null);
+                            } else if (missingOnLeft != null) {
+                                ReadEntriesCallback readFromLeftCallback =
+                                        new ReadEntriesCallback() {
+
+                                    @Override
+                                    public void readEntriesComplete(List<Entry> entriesFromLeft,
+                                                                    Object dummyCtx5) {
+                                        List<Entry> finalResult =
+                                                new ArrayList<>(entriesFromLeft.size() + entries.size());
+                                        finalResult.addAll(entriesFromLeft);
+                                        finalResult.addAll(entries);
+                                        callback.readEntriesComplete(finalResult, ctx);
+                                    }
+
+                                    @Override
+                                    public void readEntriesFailed(ManagedLedgerException exception,
+                                                                  Object dummyCtx6) {
+                                        callback.readEntriesFailed(exception, ctx);
+                                    }
+                                };
+                                asyncReadEntry0(lh, missingOnLeft.startEntry, missingOnLeft.endEntry,
+                                        shouldCacheEntry, readFromLeftCallback, null);
+                            }  else if (missingOnRight != null) {
+                                ReadEntriesCallback readFromRightCallback =
+                                        new ReadEntriesCallback() {
+
+                                    @Override
+                                    public void readEntriesComplete(List<Entry> entriesFromRight,
+                                                                    Object dummyCtx7) {
+                                        List<Entry> finalResult =
+                                                new ArrayList<>(entriesFromRight.size() + entries.size());
+                                        finalResult.addAll(entries);
+                                        finalResult.addAll(entriesFromRight);
+                                        callback.readEntriesComplete(finalResult, ctx);
+                                    }
+
+                                    @Override
+                                    public void readEntriesFailed(ManagedLedgerException exception,
+                                                                  Object dummyCtx8) {
+                                        callback.readEntriesFailed(exception, ctx);
+                                    }
+                                };
+                                asyncReadEntry0(lh, missingOnRight.startEntry, missingOnRight.endEntry,
+                                        shouldCacheEntry, readFromRightCallback, null);
+                            }
+                        }
+
+                        @Override
+                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                            callback.readEntriesFailed(exception, ctx);
+                        }
+                    };
+                    listenerAdded = cachedPendingRead.addListener(wrappedCallback, ctx, key.startEntry, key.endEntry);
+                } else {
+                    listenerAdded = cachedPendingRead.addListener(callback, ctx, key.startEntry, key.endEntry);
+                }
+
 
                 if (createdByThisThread.get()) {
                     CompletableFuture<List<EntryImpl>> readResult = lh.readAsync(firstEntry, lastEntry)
