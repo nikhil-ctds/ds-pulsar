@@ -225,6 +225,7 @@ public class ClientCnx extends PulsarHandler {
         super.channelActive(ctx);
         this.localAddress = ctx.channel().localAddress();
         this.remoteAddress = ctx.channel().remoteAddress();
+        log.info("{} localAddress {} remoteAddress {}", ctx.channel(), localAddress, remoteAddress);
 
         this.timeoutTask = this.eventLoopGroup
                 .scheduleAtFixedRate(catchingAndLoggingThrowables(this::checkRequestTimeout), operationTimeoutMs,
@@ -234,6 +235,7 @@ public class ClientCnx extends PulsarHandler {
             if (log.isDebugEnabled()) {
                 log.debug("{} Connected to broker", ctx.channel());
             }
+            log.info("{} Connected to broker", ctx.channel());
         } else {
             log.info("{} Connected through proxy to target broker at {}", ctx.channel(), proxyToTargetBrokerAddress);
         }

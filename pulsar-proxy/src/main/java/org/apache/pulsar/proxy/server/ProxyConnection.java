@@ -526,7 +526,6 @@ public class ProxyConnection extends PulsarHandler {
         ProxyConfiguration proxyConfig = service.getConfiguration();
         initialConf.setServiceUrl(
                 proxyConfig.isTlsEnabledWithBroker() ? service.getServiceUrlTls() : service.getServiceUrl());
-
         // Apply all arbitrary configuration. This must be called before setting any fields annotated as
         // @Secret on the ClientConfigurationData object because of the way they are serialized.
         // See https://github.com/apache/pulsar/issues/8509 for more information.
@@ -534,7 +533,6 @@ public class ProxyConnection extends PulsarHandler {
                 .filterAndMapProperties(proxyConfig.getProperties(), "brokerClient_");
         ClientConfigurationData clientConf = ConfigurationDataUtils
                 .loadData(overrides, initialConf, ClientConfigurationData.class);
-
         clientConf.setAuthentication(this.getClientAuthentication());
         if (proxyConfig.isTlsEnabledWithBroker()) {
             clientConf.setUseTls(true);
@@ -549,6 +547,8 @@ public class ProxyConnection extends PulsarHandler {
                 clientConf.setTlsAllowInsecureConnection(proxyConfig.isTlsAllowInsecureConnection());
             }
         }
+        LOG.info("Created client conf tlsVer {} serviceUrl {} , tls {}, dump {}",
+                clientConf.isTlsHostnameVerificationEnable(), clientConf.getServiceUrl(), clientConf.isUseTls(), clientConf);
         return clientConf;
     }
 
