@@ -25,24 +25,16 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Longs;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.prometheus.client.Counter;
 import io.prometheus.client.Summary;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import lombok.AllArgsConstructor;
-import lombok.Value;
 import org.apache.bookkeeper.client.api.BKException;
 import org.apache.bookkeeper.client.api.LedgerEntry;
 import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntriesCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
-import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
@@ -58,50 +50,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RangeEntryCacheImpl implements EntryCache {
 
-    private static final Counter COUNT_ENTRIES_READ_FROM_BK = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_entries_read")
-            .help("Total number of entries read from BK")
-            .register();
-    private static final Counter COUNT_ENTRIES_NOTREAD_FROM_BK = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_entries_notread")
-            .help("Total number of entries not read from BK")
-            .register();
-    private static final Counter COUNT_PENDING_READS_MATCHED = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_matched")
-            .help("Pending reads reused with perfect range match")
-            .register();
-    private static final Counter COUNT_PENDING_READS_MATCHED_INCLUDED = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_matched_included")
-            .help("Pending reads reused by attaching to a read with a larger range")
-            .register();
-    private static final Counter COUNT_PENDING_READS_MISSED = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_missed")
-            .help("Pending reads that didn't find a match")
-            .register();
-
-    private static final Counter COUNT_PENDING_READS_MATCHED_OVERLAPPING_MISS_LEFT = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_matched_overlapping_miss_left")
-            .help("Pending reads that didn't find a match but they partially overlap with another read")
-            .register();
-
-    private static final Counter COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_RIGHT = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_matched_overlapping_miss_right")
-            .help("Pending reads that didn't find a match but they partially overlap with another read")
-            .register();
-
-    private static final Counter COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_BOTH = Counter
-            .build()
-            .name("pulsar_ml_cache_pendingreads_matched_overlapping_miss_both")
-            .help("Pending reads that didn't find a match but they partially overlap with another read")
-            .register();
-
     static final Summary PULSAR_ML_CACHE_ENTRY_RANGE_SIZE = Summary.build()
             .name("pulsar_ml_cache_entry_range_size")
             .help("Number of entries in a range request")
@@ -110,57 +58,18 @@ public class RangeEntryCacheImpl implements EntryCache {
             .register();
 
     private final RangeEntryCacheManagerImpl manager;
-    private final ManagedLedgerImpl ml;
+    final ManagedLedgerImpl ml;
     private ManagedLedgerInterceptor interceptor;
     private final RangeCache<PositionImpl, EntryImpl> entries;
     private final boolean copyEntries;
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<PendingReadKey, CachedPendingRead>> cachedPendingReads =
-            new ConcurrentHashMap<>();
+    private final PendingReadsManager pendingReadsManager;
+
 
     private static final double MB = 1024 * 1024;
 
-    @Value
-    private static class PendingReadKey {
-        private final long startEntry;
-        private final long endEntry;
-        long size() {
-            return endEntry - startEntry + 1;
-        }
-
-
-        boolean includes(PendingReadKey other) {
-            return startEntry <= other.startEntry && other.endEntry <= endEntry;
-        }
-
-        boolean overlaps(PendingReadKey other) {
-            return (other.startEntry <= startEntry && startEntry <= other.endEntry)
-                    || (other.startEntry <= endEntry && endEntry <= other.endEntry);
-        }
-
-        PendingReadKey reminderOnLeft(PendingReadKey other) {
-            //   S******-----E
-            //          S----------E
-            if (other.startEntry <= endEntry && endEntry <= other.endEntry
-                     && other.startEntry > startEntry) {
-                return new PendingReadKey(startEntry, other.startEntry - 1);
-            }
-            return null;
-        }
-
-        PendingReadKey reminderOnRight(PendingReadKey other) {
-            //          S-----*******E
-            //   S-----------E
-            if (other.startEntry <= startEntry && startEntry <= other.endEntry
-                    && other.endEntry < endEntry) {
-                return new PendingReadKey(other.endEntry + 1, endEntry);
-            }
-            return null;
-        }
-
-    }
-
     public RangeEntryCacheImpl(RangeEntryCacheManagerImpl manager, ManagedLedgerImpl ml, boolean copyEntries) {
         this.manager = manager;
+        this.pendingReadsManager = new PendingReadsManager(this);
         this.ml = ml;
         this.interceptor = ml.getManagedLedgerInterceptor();
         this.entries = new RangeCache<>(EntryImpl::getLength, EntryImpl::getTimestamp);
@@ -360,186 +269,8 @@ public class RangeEntryCacheImpl implements EntryCache {
         }
     }
 
-    @AllArgsConstructor
-    private static final class ReadEntriesCallbackWithContext {
-        final ReadEntriesCallback callback;
-        final Object ctx;
-        final long startEntry;
-        final long endEntry;
-    }
-
-    @AllArgsConstructor
-    private static final class FindCachedPendingReadOutcome {
-        final CachedPendingRead cachedPendingRead;
-        final PendingReadKey missingOnLeft;
-        final PendingReadKey missingOnRight;
-        boolean needsAdditionalReads() {
-            return missingOnLeft != null || missingOnRight != null;
-        }
-    }
-
-    private FindCachedPendingReadOutcome findBestCandidate(PendingReadKey key, Map<PendingReadKey,
-            CachedPendingRead> ledgerCache,
-            AtomicBoolean created) {
-        synchronized (ledgerCache) {
-            CachedPendingRead existing = ledgerCache.get(key);
-            if (existing != null) {
-                COUNT_PENDING_READS_MATCHED.inc(key.size());
-                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(key.size());
-                return new FindCachedPendingReadOutcome(existing, null, null);
-            }
-            FindCachedPendingReadOutcome foundButMissingSomethingOnLeft = null;
-            FindCachedPendingReadOutcome foundButMissingSomethingOnRight = null;
-            FindCachedPendingReadOutcome foundButMissingSomethingOnBoth = null;
-
-            for (Map.Entry<PendingReadKey, CachedPendingRead> entry : ledgerCache.entrySet()) {
-                PendingReadKey entryKey = entry.getKey();
-                if (entryKey.includes(key)) {
-                    COUNT_PENDING_READS_MATCHED_INCLUDED.inc(key.size());
-                    COUNT_ENTRIES_NOTREAD_FROM_BK.inc(key.size());
-                    return new FindCachedPendingReadOutcome(entry.getValue(), null, null);
-                }
-                if (entryKey.overlaps(key)) {
-                    PendingReadKey reminderOnLeft = key.reminderOnLeft(entryKey);
-                    PendingReadKey reminderOnRight = key.reminderOnRight(entryKey);
-                    if (reminderOnLeft != null && reminderOnRight != null) {
-                        foundButMissingSomethingOnBoth = new FindCachedPendingReadOutcome(entry.getValue(),
-                                reminderOnLeft, reminderOnRight);
-                    } else if (reminderOnLeft != null && reminderOnRight == null) {
-                        foundButMissingSomethingOnLeft = new FindCachedPendingReadOutcome(entry.getValue(),
-                                reminderOnLeft, null);
-                    } else if (reminderOnRight != null && reminderOnLeft == null) {
-                        foundButMissingSomethingOnRight = new FindCachedPendingReadOutcome(entry.getValue(),
-                                null, reminderOnRight);
-                    }
-                }
-            }
-
-            if (foundButMissingSomethingOnLeft != null) {
-                long delta = key.size()
-                        - foundButMissingSomethingOnLeft.missingOnLeft.size();
-                COUNT_PENDING_READS_MATCHED_OVERLAPPING_MISS_LEFT.inc(delta);
-                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(delta);
-                return foundButMissingSomethingOnLeft;
-            } else if (foundButMissingSomethingOnRight != null) {
-                long delta = key.size()
-                        - foundButMissingSomethingOnRight.missingOnRight.size();
-                COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_RIGHT.inc(delta);
-                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(delta);
-                return foundButMissingSomethingOnRight;
-            } else if (foundButMissingSomethingOnBoth != null) {
-                long delta = key.size()
-                        - foundButMissingSomethingOnBoth.missingOnRight.size()
-                        - foundButMissingSomethingOnBoth.missingOnLeft.size();
-                COUNT_ENTRIES_NOTREAD_FROM_BK.inc(delta);
-                COUNT_PENDING_READS_MATCHED_BUT_OVERLAPPING_MISS_BOTH.inc(delta);
-                return foundButMissingSomethingOnBoth;
-            }
-
-            created.set(true);
-            CachedPendingRead newRead = new CachedPendingRead(key, ledgerCache);
-            ledgerCache.put(key, newRead);
-            long delta = key.size();
-            COUNT_PENDING_READS_MISSED.inc(delta);
-            COUNT_ENTRIES_READ_FROM_BK.inc(delta);
-            return new FindCachedPendingReadOutcome(newRead, null, null);
-        }
-    }
-
-    private class CachedPendingRead {
-        final PendingReadKey key;
-        final Map<PendingReadKey, CachedPendingRead> ledgerCache;
-        final List<ReadEntriesCallbackWithContext> callbacks = new ArrayList<>(1);
-        boolean completed = false;
-
-        public CachedPendingRead(PendingReadKey key,
-                                 Map<PendingReadKey, CachedPendingRead> ledgerCache) {
-            this.key = key;
-            this.ledgerCache = ledgerCache;
-        }
-
-        private List<EntryImpl> keepEntries(List<EntryImpl> list, long startEntry, long endEntry) {
-            List<EntryImpl> result = new ArrayList<>((int) (endEntry - startEntry));
-            for (EntryImpl entry : list) {
-                long entryId = entry.getEntryId();
-                if (startEntry <= entryId && entryId <= endEntry) {
-                    result.add(entry);
-                } else {
-                    entry.release();
-                }
-            }
-            return result;
-        }
-
-        public void attach(CompletableFuture<List<EntryImpl>> handle) {
-            // when the future is done remove this from the map
-            // new reads will go to a new instance
-            // this is required because we are going to do refcount management
-            // on the results of the callback
-            handle.whenComplete((___, error) -> {
-                synchronized (CachedPendingRead.this) {
-                    completed = true;
-                    synchronized (ledgerCache) {
-                        ledgerCache.remove(key, this);
-                    }
-                }
-            });
-
-            handle.thenAcceptAsync(entriesToReturn -> {
-                synchronized (CachedPendingRead.this) {
-                    if (callbacks.size() == 1) {
-                        ReadEntriesCallbackWithContext first = callbacks.get(0);
-                        if (first.startEntry == key.startEntry
-                             && first.endEntry == key.endEntry) {
-                            // perfect match, no copy, this is the most common case
-                            first.callback.readEntriesComplete((List) entriesToReturn,
-                                            first.ctx);
-                        } else {
-                            first.callback.readEntriesComplete(
-                                    (List) keepEntries(entriesToReturn, first.startEntry, first.endEntry),
-                                            first.ctx);
-                        }
-                    } else {
-                        for (ReadEntriesCallbackWithContext callback : callbacks) {
-                            long callbackStartEntry = callback.startEntry;
-                            long callbackEndEntry = callback.endEntry;
-                            List<EntryImpl> copy = new ArrayList<>((int) (callbackEndEntry - callbackEndEntry + 1));
-                            for (EntryImpl entry : entriesToReturn) {
-                                long entryId = entry.getEntryId();
-                                if (callbackStartEntry <= entryId && entryId <= callbackEndEntry) {
-                                    EntryImpl entryCopy = EntryImpl.create(entry);
-                                    copy.add(entryCopy);
-                                }
-                            }
-                            callback.callback.readEntriesComplete((List) copy, callback.ctx);
-                        }
-                        for (EntryImpl entry : entriesToReturn) {
-                            entry.release();
-                        }
-                    }
-                }
-            }, ml.getExecutor().chooseThread(ml.getName())).exceptionally(exception -> {
-                synchronized (CachedPendingRead.this) {
-                    for (ReadEntriesCallbackWithContext callback : callbacks) {
-                        ManagedLedgerException mlException = createManagedLedgerException(exception);
-                        callback.callback.readEntriesFailed(mlException, callback.ctx);
-                    }
-                }
-                return null;
-            });
-        }
-
-        synchronized boolean addListener(ReadEntriesCallback callback, Object ctx, long startEntry, long endEntry) {
-            if (completed) {
-                return false;
-            }
-            callbacks.add(new ReadEntriesCallbackWithContext(callback, ctx, startEntry, endEntry));
-            return true;
-        }
-    }
-
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private void asyncReadEntry0(ReadHandle lh, long firstEntry, long lastEntry, boolean shouldCacheEntry,
+    void asyncReadEntry0(ReadHandle lh, long firstEntry, long lastEntry, boolean shouldCacheEntry,
             final ReadEntriesCallback callback, Object ctx) {
         final long ledgerId = lh.getId();
         final int entriesToRead = (int) (lastEntry - firstEntry) + 1;
@@ -578,167 +309,61 @@ public class RangeEntryCacheImpl implements EntryCache {
             }
 
             // Read all the entries from bookkeeper
-            final PendingReadKey key = new PendingReadKey(firstEntry, lastEntry);
+            pendingReadsManager.readEntries(lh, firstEntry, lastEntry,
+                    shouldCacheEntry, callback, ctx);
 
-            Map<PendingReadKey, CachedPendingRead> pendingReadsForLedger =
-                    cachedPendingReads.computeIfAbsent(ledgerId, (l) -> new ConcurrentHashMap<>());
-
-            boolean listenerAdded = false;
-            while (!listenerAdded) {
-                AtomicBoolean createdByThisThread = new AtomicBoolean();
-                FindCachedPendingReadOutcome findBestCandidateOutcome = findBestCandidate(key,
-                        pendingReadsForLedger, createdByThisThread);
-                CachedPendingRead cachedPendingRead = findBestCandidateOutcome.cachedPendingRead;
-                if (findBestCandidateOutcome.needsAdditionalReads()) {
-                    ReadEntriesCallback wrappedCallback = new ReadEntriesCallback() {
-                        @Override
-                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
-                            PendingReadKey missingOnLeft = findBestCandidateOutcome.missingOnLeft;
-                            PendingReadKey missingOnRight = findBestCandidateOutcome.missingOnRight;
-                            if (missingOnRight != null && missingOnLeft != null) {
-                                ReadEntriesCallback readFromLeftCallback = new ReadEntriesCallback() {
-                                    @Override
-                                    public void readEntriesComplete(List<Entry> entriesFromLeft, Object dummyCtx1) {
-                                        ReadEntriesCallback readFromRightCallback = new ReadEntriesCallback() {
-                                            @Override
-                                            public void readEntriesComplete(List<Entry> entriesFromRight,
-                                                                            Object dummyCtx2) {
-                                                List<Entry> finalResult =
-                                                        new ArrayList<>(entriesFromLeft.size()
-                                                            + entries.size() + entriesFromRight.size());
-                                                finalResult.addAll(entriesFromLeft);
-                                                finalResult.addAll(entries);
-                                                finalResult.addAll(entriesFromRight);
-                                                callback.readEntriesComplete(finalResult, ctx);
-                                            }
-
-                                            @Override
-                                            public void readEntriesFailed(ManagedLedgerException exception,
-                                                                          Object dummyCtx3) {
-                                                callback.readEntriesFailed(exception, ctx);
-                                            }
-                                        };
-                                        asyncReadEntry0(lh, missingOnRight.startEntry, missingOnRight.endEntry,
-                                                shouldCacheEntry, readFromRightCallback, null);
-                                    }
-
-                                    @Override
-                                    public void readEntriesFailed(ManagedLedgerException exception, Object dummyCtx4) {
-                                        callback.readEntriesFailed(exception, ctx);
-                                    }
-                                };
-                                asyncReadEntry0(lh, missingOnLeft.startEntry, missingOnLeft.endEntry,
-                                        shouldCacheEntry, readFromLeftCallback, null);
-                            } else if (missingOnLeft != null) {
-                                ReadEntriesCallback readFromLeftCallback =
-                                        new ReadEntriesCallback() {
-
-                                    @Override
-                                    public void readEntriesComplete(List<Entry> entriesFromLeft,
-                                                                    Object dummyCtx5) {
-                                        List<Entry> finalResult =
-                                                new ArrayList<>(entriesFromLeft.size() + entries.size());
-                                        finalResult.addAll(entriesFromLeft);
-                                        finalResult.addAll(entries);
-                                        callback.readEntriesComplete(finalResult, ctx);
-                                    }
-
-                                    @Override
-                                    public void readEntriesFailed(ManagedLedgerException exception,
-                                                                  Object dummyCtx6) {
-                                        callback.readEntriesFailed(exception, ctx);
-                                    }
-                                };
-                                asyncReadEntry0(lh, missingOnLeft.startEntry, missingOnLeft.endEntry,
-                                        shouldCacheEntry, readFromLeftCallback, null);
-                            }  else if (missingOnRight != null) {
-                                ReadEntriesCallback readFromRightCallback =
-                                        new ReadEntriesCallback() {
-
-                                    @Override
-                                    public void readEntriesComplete(List<Entry> entriesFromRight,
-                                                                    Object dummyCtx7) {
-                                        List<Entry> finalResult =
-                                                new ArrayList<>(entriesFromRight.size() + entries.size());
-                                        finalResult.addAll(entries);
-                                        finalResult.addAll(entriesFromRight);
-                                        callback.readEntriesComplete(finalResult, ctx);
-                                    }
-
-                                    @Override
-                                    public void readEntriesFailed(ManagedLedgerException exception,
-                                                                  Object dummyCtx8) {
-                                        callback.readEntriesFailed(exception, ctx);
-                                    }
-                                };
-                                asyncReadEntry0(lh, missingOnRight.startEntry, missingOnRight.endEntry,
-                                        shouldCacheEntry, readFromRightCallback, null);
-                            }
-                        }
-
-                        @Override
-                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                            callback.readEntriesFailed(exception, ctx);
-                        }
-                    };
-                    listenerAdded = cachedPendingRead.addListener(wrappedCallback, ctx, key.startEntry, key.endEntry);
-                } else {
-                    listenerAdded = cachedPendingRead.addListener(callback, ctx, key.startEntry, key.endEntry);
-                }
-
-
-                if (createdByThisThread.get()) {
-                    CompletableFuture<List<EntryImpl>> readResult = lh.readAsync(firstEntry, lastEntry)
-                            .thenApply(
-                                    ledgerEntries -> {
-                                        requireNonNull(ml.getName());
-                                        requireNonNull(ml.getExecutor());
-
-                                        try {
-                                            // We got the entries, we need to transform them to a List<> type
-                                            long totalSize = 0;
-                                            final List<EntryImpl> entriesToReturn =
-                                                    Lists.newArrayListWithExpectedSize(entriesToRead);
-                                            for (LedgerEntry e : ledgerEntries) {
-                                                EntryImpl entry = RangeEntryCacheManagerImpl.create(e, interceptor);
-                                                entriesToReturn.add(entry);
-                                                totalSize += entry.getLength();
-                                                if (shouldCacheEntry) {
-                                                    EntryImpl cacheEntry = EntryImpl.create(entry);
-                                                    insert(cacheEntry);
-                                                    cacheEntry.release();
-                                                }
-                                            }
-
-                                            manager.mlFactoryMBean.recordCacheMiss(entriesToReturn.size(), totalSize);
-                                            ml.getMbean().addReadEntriesSample(entriesToReturn.size(), totalSize);
-
-                                            return entriesToReturn;
-                                        } finally {
-                                            ledgerEntries.close();
-                                        }
-                                    });
-                    // handle LH invalidation
-                    readResult.exceptionally(exception -> {
-                        if (exception instanceof BKException
-                                && ((BKException) exception).getCode() == BKException.Code.TooManyRequestsException) {
-                        } else {
-                            ml.invalidateLedgerHandle(lh);
-                        }
-                        return null;
-                    });
-
-                    cachedPendingRead.attach(readResult);
-                }
-            }
         }
+    }
+
+    CompletableFuture readFromStorage(ReadHandle lh, long firstEntry, long lastEntry, boolean shouldCacheEntry) {
+        final int entriesToRead = (int) (lastEntry - firstEntry) + 1;
+        CompletableFuture<List<EntryImpl>> readResult = lh.readAsync(firstEntry, lastEntry)
+                .thenApply(
+                        ledgerEntries -> {
+                            requireNonNull(ml.getName());
+                            requireNonNull(ml.getExecutor());
+
+                            try {
+                                // We got the entries, we need to transform them to a List<> type
+                                long totalSize = 0;
+                                final List<EntryImpl> entriesToReturn =
+                                        Lists.newArrayListWithExpectedSize(entriesToRead);
+                                for (LedgerEntry e : ledgerEntries) {
+                                    EntryImpl entry = RangeEntryCacheManagerImpl.create(e, interceptor);
+                                    entriesToReturn.add(entry);
+                                    totalSize += entry.getLength();
+                                    if (shouldCacheEntry) {
+                                        EntryImpl cacheEntry = EntryImpl.create(entry);
+                                        insert(cacheEntry);
+                                        cacheEntry.release();
+                                    }
+                                }
+
+                                manager.mlFactoryMBean.recordCacheMiss(entriesToReturn.size(), totalSize);
+                                ml.getMbean().addReadEntriesSample(entriesToReturn.size(), totalSize);
+
+                                return entriesToReturn;
+                            } finally {
+                                ledgerEntries.close();
+                            }
+                        });
+        // handle LH invalidation
+        readResult.exceptionally(exception -> {
+            if (exception instanceof BKException
+                    && ((BKException) exception).getCode() == BKException.Code.TooManyRequestsException) {
+            } else {
+                ml.invalidateLedgerHandle(lh);
+            }
+            return null;
+        });
+        return readResult;
     }
 
     @Override
     public void clear() {
         Pair<Integer, Long> removedPair = entries.clear();
         manager.entriesRemoved(removedPair.getRight(), removedPair.getLeft());
-        cachedPendingReads.clear();
+        pendingReadsManager.clear();
     }
 
     @Override
