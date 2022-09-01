@@ -114,7 +114,7 @@ public class PendingReadsManager {
         PendingReadKey reminderOnLeft(PendingReadKey other) {
             //   S******-----E
             //          S----------E
-            if (other.startEntry <= endEntry && endEntry <= other.endEntry
+            if (other.startEntry <= endEntry
                     && other.startEntry > startEntry) {
                 return new PendingReadKey(startEntry, other.startEntry - 1);
             }
@@ -124,7 +124,7 @@ public class PendingReadsManager {
         PendingReadKey reminderOnRight(PendingReadKey other) {
             //          S-----*******E
             //   S-----------E
-            if (other.startEntry <= startEntry && startEntry <= other.endEntry
+            if (startEntry <= other.endEntry
                     && other.endEntry < endEntry) {
                 return new PendingReadKey(other.endEntry + 1, endEntry);
             }
@@ -180,9 +180,6 @@ public class PendingReadsManager {
                     } else if (reminderOnRight != null && reminderOnLeft == null) {
                         foundButMissingSomethingOnRight = new FindPendingReadOutcome(entry.getValue(),
                                 null, reminderOnRight);
-                        // we can exit the loop in this case, as below we are not going to
-                        // consider the other options
-                        break;
                     } else if (reminderOnLeft != null && reminderOnRight == null) {
                         foundButMissingSomethingOnLeft = new FindPendingReadOutcome(entry.getValue(),
                                 reminderOnLeft, null);
@@ -293,8 +290,8 @@ public class PendingReadsManager {
                         }
                     }
                 }
-            }, rangeEntryCache.ml.getExecutor()
-                    .chooseThread(rangeEntryCache.ml.getName())).exceptionally(exception -> {
+            }, rangeEntryCache.getManagedLedger().getExecutor()
+                    .chooseThread(rangeEntryCache.getManagedLedger().getName())).exceptionally(exception -> {
                 synchronized (PendingRead.this) {
                     for (ReadEntriesCallbackWithContext callback : callbacks) {
                         ManagedLedgerException mlException = createManagedLedgerException(exception);
