@@ -1013,6 +1013,10 @@ public abstract class NamespacesBase extends AdminResource {
         log.info("[{}] Split namespace bundle {}/{}", clientAppId(), namespaceName, bundleName);
 
         String bundleRange = getBundleRange(bundleName);
+        if (bundleRange == null) {
+            throw new RestException(Status.NOT_FOUND,
+                    String.format("Bundle range %s not found", bundleName));
+        }
 
         Policies policies = getNamespacePolicies(namespaceName);
 
@@ -1120,13 +1124,18 @@ public abstract class NamespacesBase extends AdminResource {
     }
 
     private String getBundleRange(String bundleName) {
+        NamespaceBundle nsBundle;
         if (BundleType.LARGEST.toString().equals(bundleName)) {
-            return findLargestBundleWithTopics(namespaceName).getBundleRange();
+            nsBundle = findLargestBundleWithTopics(namespaceName);
         } else if (BundleType.HOT.toString().equals(bundleName)) {
-            return findHotBundle(namespaceName).getBundleRange();
+            nsBundle = findHotBundle(namespaceName);
         } else {
             return bundleName;
         }
+        if (nsBundle == null) {
+            return null;
+        }
+        return nsBundle.getBundleRange();
     }
 
     private NamespaceBundle findLargestBundleWithTopics(NamespaceName namespaceName) {
