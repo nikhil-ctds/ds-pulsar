@@ -664,20 +664,7 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
             }
         }
 
-        // acquire message-dispatch permits for already delivered messages
-        long permits = dispatchThrottlingOnBatchMessageEnabled ? totalEntries : totalMessagesSent;
-        if (serviceConfig.isDispatchThrottlingOnNonBacklogConsumerEnabled() || !cursor.isActive()) {
-            if (topic.getBrokerDispatchRateLimiter().isPresent()) {
-                topic.getBrokerDispatchRateLimiter().get().tryDispatchPermit(permits, totalBytesSent);
-            }
-            if (topic.getDispatchRateLimiter().isPresent()) {
-                topic.getDispatchRateLimiter().get().tryDispatchPermit(permits, totalBytesSent);
-            }
-
-            if (dispatchRateLimiter.isPresent()) {
-                dispatchRateLimiter.get().tryDispatchPermit(permits, totalBytesSent);
-            }
-        }
+        acquirePermitsForDeliveredMessages(topic, cursor, totalEntries, totalMessagesSent, totalBytesSent);
 
         if (entriesToDispatch > 0) {
             if (log.isDebugEnabled()) {
