@@ -26,6 +26,7 @@ import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Shell configurations store layer.
@@ -59,7 +60,7 @@ public interface ConfigStore {
         try (Scanner scanner = new Scanner(entry.getValue());) {
             while (scanner.hasNextLine()) {
                 String line = scanner.nextLine().trim();
-                if (line.isBlank() || line.startsWith("#")) {
+                if (StringUtils.isBlank(line) || line.startsWith("#")) {
                     continue;
                 }
                 builder.append(line);
@@ -75,7 +76,7 @@ public interface ConfigStore {
         try (Scanner scanner = new Scanner(entry.getValue());) {
             while (scanner.hasNextLine()) {
                 String line = scanner.nextLine().trim();
-                if (line.isBlank() || line.startsWith("#")) {
+                if (StringUtils.isBlank(line) || line.startsWith("#")) {
                     continue;
                 }
                 final String[] split = line.split("=", 2);
@@ -103,7 +104,7 @@ public interface ConfigStore {
         try (Scanner scanner = new Scanner(entry.getValue());) {
             while (scanner.hasNextLine()) {
                 String line = scanner.nextLine().trim();
-                if (line.isBlank() || line.startsWith("#")) {
+                if (StringUtils.isBlank(line) || line.startsWith("#")) {
                     continue;
                 }
                 final String[] split = line.split("=", 2);
