@@ -402,7 +402,7 @@ public class PersistentSubscription extends AbstractSubscription implements Subs
             }
 
             if (dispatcher != null) {
-                dispatcher.getRedeliveryTracker().removeBatch(positions);
+                dispatcher.getRedeliveryTracker().removeBatch(positions, cursor.getMarkDeletedPosition());
             }
         }
 
