@@ -149,7 +149,7 @@ public class ClientCnx extends PulsarHandler {
 
     private final int maxNumberOfRejectedRequestPerConnection;
     private final int rejectedRequestResetTimeSec = 60;
-    private final int protocolVersion;
+    protected final int protocolVersion;
     private final long operationTimeoutMs;
 
     protected String proxyToTargetBrokerAddress = null;
@@ -165,7 +165,10 @@ public class ClientCnx extends PulsarHandler {
     protected AuthenticationDataProvider authenticationDataProvider;
     private TransactionBufferHandler transactionBufferHandler;
 
-    enum State {
+    @Getter
+    private long lastDisconnectedTimestamp;
+
+    protected enum State {
         None, SentConnectFrame, Ready, Failed, Connecting
     }
 
@@ -269,6 +272,7 @@ public class ClientCnx extends PulsarHandler {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
+        lastDisconnectedTimestamp = System.currentTimeMillis();
         log.info("{} Disconnected", ctx.channel());
         if (!connectionFuture.isDone()) {
             connectionFuture.completeExceptionally(new PulsarClientException("Connection already closed"));
@@ -1166,6 +1170,13 @@ public class ClientCnx extends PulsarHandler {
 
     public void close() {
        if (ctx != null) {
+           ctx.close();
+       }
+    }
+
+    protected void closeWithException(Throwable e) {
+       if (ctx != null) {
+           connectionFuture.completeExceptionally(e);
            ctx.close();
        }
     }
