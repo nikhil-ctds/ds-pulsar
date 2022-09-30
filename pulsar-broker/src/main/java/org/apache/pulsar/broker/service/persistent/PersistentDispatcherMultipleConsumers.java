@@ -691,7 +691,9 @@ public class PersistentDispatcherMultipleConsumers extends AbstractDispatcherMul
         if (!redeliveryTracker.hasRedeliveredEntry(entries)){
             return super.getNextConsumer();
         }
-        if (redeliveryTracker instanceof InMemoryAndPreventCycleFilterRedeliveryTracker tracker){
+        if (redeliveryTracker instanceof InMemoryAndPreventCycleFilterRedeliveryTracker){
+            InMemoryAndPreventCycleFilterRedeliveryTracker tracker =
+                    (InMemoryAndPreventCycleFilterRedeliveryTracker) redeliveryTracker;
             if (tracker.pausedConsumerCount() == consumerSet.size()){
                 log.warn("No consumers are currently able to consume the first redelivery entry {}",
                         tracker.getRedeliveryStartAt());

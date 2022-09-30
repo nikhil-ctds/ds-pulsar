@@ -21,6 +21,8 @@ package org.apache.pulsar.broker.service;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
 import lombok.Getter;
 import org.apache.bookkeeper.mledger.Position;
 
@@ -130,7 +132,7 @@ public class InMemoryAndPreventCycleFilterRedeliveryTracker extends InMemoryRede
         redeliveryStartAt = null;
         // If consumer has been closed, remove this consumer.
         List<Consumer> closedConsumers = earliestEntryRedeliveryCountMapping.keySet().stream()
-                .filter(Consumer::isClosed).toList();
+                .filter(Consumer::isClosed).collect(Collectors.toList());
         closedConsumers.forEach(earliestEntryRedeliveryCountMapping::remove);
         // Just reset counter to 0, because value will be removed if consumer is closed.
         earliestEntryRedeliveryCountMapping.values().forEach(i -> i.set(0));
