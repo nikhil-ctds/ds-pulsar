@@ -520,11 +520,11 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
         }
 
         return openLedger(position.getLedgerId())
-            .thenCompose((ledger) ->
+            .thenComposeAsync((ledger) ->
                 Functions.getLedgerEntry(ledger, position.getEntryId())
                     .thenCompose(entry -> closeLedger(ledger)
                         .thenApply(ignore -> entry)
-                    )
+                    ), pulsar.getExecutor()
             ).thenCompose(Functions::parseSchemaEntry);
     }
 
