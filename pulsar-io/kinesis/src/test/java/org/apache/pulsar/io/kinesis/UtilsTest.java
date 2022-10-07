@@ -472,7 +472,7 @@ public class UtilsTest {
             }
         };
 
-        Record<GenericObject> genericObjectRecord = new Record<>() {
+        Record<GenericObject> genericObjectRecord = new Record<GenericObject>() {
             @Override
             public Optional<String> getTopicName() {
                 return Optional.of("data-ks1.table1");
