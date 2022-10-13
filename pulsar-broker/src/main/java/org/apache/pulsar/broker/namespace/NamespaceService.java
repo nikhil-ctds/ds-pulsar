@@ -1421,7 +1421,6 @@ public class NamespaceService implements AutoCloseable {
                 || HEARTBEAT_NAMESPACE_PATTERN_V2.matcher(namespace).matches();
     }
 
-
     public boolean registerSLANamespace() throws PulsarServerException {
         boolean isNameSpaceRegistered = registerNamespace(getSLAMonitorNamespace(host, config), false);
         if (isNameSpaceRegistered) {
