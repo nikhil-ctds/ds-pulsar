@@ -180,7 +180,8 @@ public class PartitionedSystemTopicTest extends BrokerTestBase {
         admin.brokers().healthcheck(TopicVersion.V2);
         NamespaceName namespaceName = NamespaceService.getHeartbeatNamespaceV2(pulsar.getAdvertisedAddress(),
                 pulsar.getConfig());
-        TopicName topicName = TopicName.get("persistent", namespaceName, EventsTopicNames.NAMESPACE_EVENTS_LOCAL_NAME);
+        TopicName topicName = TopicName.get("persistent", namespaceName,
+                EventsTopicNames.NAMESPACE_EVENTS_LOCAL_NAME);
         Optional<Topic> optionalTopic = pulsar.getBrokerService()
                 .getTopic(topicName.getPartition(1).toString(), false).join();
         Assert.assertFalse(optionalTopic.isPresent());
@@ -191,7 +192,8 @@ public class PartitionedSystemTopicTest extends BrokerTestBase {
         admin.brokers().healthcheck(TopicVersion.V2);
         NamespaceName namespaceName = NamespaceService.getHeartbeatNamespaceV2(pulsar.getAdvertisedAddress(),
                 pulsar.getConfig());
-        TopicName topicName = TopicName.get("persistent", namespaceName, EventsTopicNames.NAMESPACE_EVENTS_LOCAL_NAME);
+        TopicName topicName = TopicName.get("persistent", namespaceName,
+                EventsTopicNames.NAMESPACE_EVENTS_LOCAL_NAME);
         for (int partition = 0; partition < PARTITIONS; partition ++) {
             pulsar.getBrokerService()
                     .getTopic(topicName.getPartition(partition).toString(), true).join();
