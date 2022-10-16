@@ -99,6 +99,17 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         return entry;
     }
 
+    public static EntryImpl createAndCopy(EntryImpl other) {
+        EntryImpl entry = RECYCLER.get();
+        entry.timestamp = System.nanoTime();
+        entry.ledgerId = other.ledgerId;
+        entry.entryId = other.entryId;
+        entry.data = other.data.copy();
+        entry.data.retain();
+        entry.setRefCnt(1);
+        return entry;
+    }
+
     private EntryImpl(Recycler.Handle<EntryImpl> recyclerHandle) {
         this.recyclerHandle = recyclerHandle;
     }

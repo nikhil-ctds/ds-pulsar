@@ -291,7 +291,8 @@ public class PendingReadsManager {
                             for (EntryImpl entry : entriesToReturn) {
                                 long entryId = entry.getEntryId();
                                 if (callbackStartEntry <= entryId && entryId <= callbackEndEntry) {
-                                    EntryImpl entryCopy = EntryImpl.create(entry);
+                                    // copy the data, this way the new buffer is independent
+                                    EntryImpl entryCopy = EntryImpl.createAndCopy(entry);
                                     copy.add(entryCopy);
                                 }
                             }
