@@ -20,12 +20,7 @@ package org.apache.pulsar.broker.service.utils;
 
 import java.util.Queue;
 
-<<<<<<< HEAD
-=======
-import org.apache.pulsar.common.api.proto.CommandGetTopicsOfNamespaceResponse;
 import org.apache.pulsar.common.api.proto.CommandPartitionedTopicMetadataResponse;
-import org.apache.pulsar.common.api.proto.CommandWatchTopicListSuccess;
->>>>>>> 256bd68770d ([improve][broker]prevent partitioned metadata lookup request when broker is closing (#17315))
 import org.apache.pulsar.common.protocol.PulsarDecoder;
 import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandCloseConsumer;

@@ -2138,24 +2138,6 @@ public class ServerCnxTest {
         serverCnx.handleAddSubscriptionToTxn(any());
     }
 
-    @Test(expectedExceptions = IllegalArgumentException.class)
-    public void shouldFailHandleCommandWatchTopicList() throws Exception {
-        ServerCnx serverCnx = mock(ServerCnx.class, CALLS_REAL_METHODS);
-        Field stateUpdater = ServerCnx.class.getDeclaredField("state");
-        stateUpdater.setAccessible(true);
-        stateUpdater.set(serverCnx, ServerCnx.State.Failed);
-        serverCnx.handleCommandWatchTopicList(any());
-    }
-
-    @Test(expectedExceptions = IllegalArgumentException.class)
-    public void shouldFailHandleCommandWatchTopicListClose() throws Exception {
-        ServerCnx serverCnx = mock(ServerCnx.class, CALLS_REAL_METHODS);
-        Field stateUpdater = ServerCnx.class.getDeclaredField("state");
-        stateUpdater.setAccessible(true);
-        stateUpdater.set(serverCnx, ServerCnx.State.Failed);
-        serverCnx.handleCommandWatchTopicListClose(any());
-    }
-
     @Test(timeOut = 30000)
     public void handleConnectWithServiceNotReady() throws Exception {
         resetChannel();
