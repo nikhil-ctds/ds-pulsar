@@ -34,4 +34,5 @@ COPY --from=pulsar-all "/connectors/pulsar-io-kafka-[^connect-adaptor*]*.nar" /p
 COPY --from=pulsar-all /connectors/pulsar-io-jdbc-*.nar /pulsar/connectors/
 COPY --from=pulsar-all /connectors/pulsar-io-debezium-*.nar /pulsar/connectors/
 COPY --from=pulsar-all /connectors/pulsar-io-data-generator-*.nar /pulsar/connectors/
+COPY --from=pulsar-all /connectors/pulsar-io-http-*.nar /pulsar/connectors/
 COPY --from=pulsar-all /offloaders /pulsar/offloaders
