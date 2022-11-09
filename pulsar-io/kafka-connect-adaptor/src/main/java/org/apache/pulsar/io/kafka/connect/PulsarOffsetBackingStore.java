@@ -255,7 +255,7 @@ public class PulsarOffsetBackingStore implements OffsetBackingStore {
 
     private Map<String, Object> loadConfigFromJsonString(String config) throws JsonProcessingException {
         if (!isBlank(config)) {
-            return mapper.readValue(config, new TypeReference<>() {});
+            return mapper.readValue(config, new TypeReference<Map<String, Object>>() {});
         } else {
             return Collections.emptyMap();
         }
