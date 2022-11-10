@@ -45,7 +45,7 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
     private long entryId;
     ByteBuf data;
 
-    private Runnable onDellocate;
+    private Runnable onDeallocate;
 
     public static EntryImpl create(LedgerEntry ledgerEntry) {
         EntryImpl entry = RECYCLER.get();
@@ -55,7 +55,6 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         entry.data = ledgerEntry.getEntryBuffer();
         entry.data.retain();
         entry.setRefCnt(1);
-        entry.onDellocate = null;
         return entry;
     }
 
@@ -67,7 +66,6 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         entry.entryId = entryId;
         entry.data = Unpooled.wrappedBuffer(data);
         entry.setRefCnt(1);
-        entry.onDellocate = null;
         return entry;
     }
 
@@ -79,7 +77,6 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         entry.data = data;
         entry.data.retain();
         entry.setRefCnt(1);
-        entry.onDellocate = null;
         return entry;
     }
 
@@ -91,7 +88,6 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         entry.data = data;
         entry.data.retain();
         entry.setRefCnt(1);
-        entry.onDellocate = null;
         return entry;
     }
 
@@ -102,7 +98,6 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         entry.entryId = other.entryId;
         entry.data = other.data.retainedDuplicate();
         entry.setRefCnt(1);
-        entry.onDellocate = null;
         return entry;
     }
 
@@ -110,13 +105,13 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
         this.recyclerHandle = recyclerHandle;
     }
 
-    public void onDellocate(Runnable r) {
-        if (this.onDellocate == null) {
-            this.onDellocate = r;
+    public void onDeallocate(Runnable r) {
+        if (this.onDeallocate == null) {
+            this.onDeallocate = r;
         } else {
             // this is not expected to happen
-            Runnable previous = this.onDellocate;
-            this.onDellocate = () -> {
+            Runnable previous = this.onDeallocate;
+            this.onDeallocate = () -> {
                 try {
                     previous.run();
                 } finally {
@@ -183,11 +178,11 @@ public final class EntryImpl extends AbstractCASReferenceCounted implements Entr
     @Override
     protected void deallocate() {
         // This method is called whenever the ref-count of the EntryImpl reaches 0, so that now we can recycle it
-        if (onDellocate != null) {
+        if (onDeallocate != null) {
             try {
-                onDellocate.run();
+                onDeallocate.run();
             } finally {
-                onDellocate = null;
+                onDeallocate = null;
             }
         }
         data.release();
