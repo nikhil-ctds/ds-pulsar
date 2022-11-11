@@ -23,8 +23,10 @@ import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.Parameters;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.transaction.TxnID;
+import org.apache.pulsar.common.policies.data.TransactionCoordinatorInfo;
 import org.apache.pulsar.common.util.RelativeTimeUtil;
 
 @Parameters(commandDescription = "Operations on transactions")
@@ -178,6 +180,23 @@ public class CmdTransactions extends CmdBase {
         }
     }
 
+    @Parameters(commandDescription = "List transaction coordinators")
+    private class ListTransactionCoordinators extends CliCommand {
+        @Override
+        void run() throws Exception {
+            print(getAdmin()
+                    .transactions()
+                    .listTransactionCoordinators()
+                    .stream()
+                    .collect(Collectors.toMap(
+                            TransactionCoordinatorInfo::getId,
+                            TransactionCoordinatorInfo::getBrokerServiceUrl
+                    ))
+            );
+        }
+    }
+
+
     public CmdTransactions(Supplier<PulsarAdmin> admin) {
         super("transactions", admin);
         jcommander.addCommand("coordinator-internal-stats", new GetCoordinatorInternalStats());
@@ -189,5 +208,6 @@ public class CmdTransactions extends CmdBase {
         jcommander.addCommand("transaction-in-pending-ack-stats", new GetTransactionInPendingAckStats());
         jcommander.addCommand("transaction-metadata", new GetTransactionMetadata());
         jcommander.addCommand("slow-transactions", new GetSlowTransactions());
+        jcommander.addCommand("coordinators-list", new ListTransactionCoordinators());
     }
 }

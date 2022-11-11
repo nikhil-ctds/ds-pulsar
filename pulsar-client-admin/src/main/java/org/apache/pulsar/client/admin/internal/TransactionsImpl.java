@@ -18,6 +18,7 @@
  */
 package org.apache.pulsar.client.admin.internal;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +30,7 @@ import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.transaction.TxnID;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.TransactionBufferStats;
+import org.apache.pulsar.common.policies.data.TransactionCoordinatorInfo;
 import org.apache.pulsar.common.policies.data.TransactionCoordinatorInternalStats;
 import org.apache.pulsar.common.policies.data.TransactionCoordinatorStats;
 import org.apache.pulsar.common.policies.data.TransactionInBufferStats;
@@ -43,6 +45,29 @@ public class TransactionsImpl extends BaseResource implements Transactions {
     public TransactionsImpl(WebTarget web, Authentication auth, long readTimeoutMs) {
         super(auth, readTimeoutMs);
         adminV3Transactions = web.path("/admin/v3/transactions");
+    }
+
+    @Override
+    public List<TransactionCoordinatorInfo> listTransactionCoordinators() throws PulsarAdminException {
+        return sync(() -> listTransactionCoordinatorsAsync());
+    }
+
+    @Override
+    public CompletableFuture<List<TransactionCoordinatorInfo>> listTransactionCoordinatorsAsync() {
+        WebTarget path = adminV3Transactions.path("coordinators");
+        final CompletableFuture<List<TransactionCoordinatorInfo>> future = new CompletableFuture<>();
+        asyncGetRequest(path, new InvocationCallback<List<TransactionCoordinatorInfo>>() {
+                    @Override
+                    public void completed(List<TransactionCoordinatorInfo> stats) {
+                        future.complete(stats);
+                    }
+
+                    @Override
+                    public void failed(Throwable throwable) {
+                        future.completeExceptionally(getApiException(throwable.getCause()));
+                    }
+                });
+        return future;
     }
 
     @Override

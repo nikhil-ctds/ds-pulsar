@@ -2097,6 +2097,10 @@ public class PulsarAdminToolTest {
         cmdTransactions = new CmdTransactions(() -> admin);
         cmdTransactions.run(split("pending-ack-internal-stats -t test -s test"));
         verify(transactions).getPendingAckInternalStats("test", "test", false);
+
+        cmdTransactions = new CmdTransactions(() -> admin);
+        cmdTransactions.run(split("coordinators-list"));
+        verify(transactions).listTransactionCoordinators();
     }
 
     @Test
