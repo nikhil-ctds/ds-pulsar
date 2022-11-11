@@ -77,7 +77,7 @@ public abstract class TransactionsBase extends AdminResource {
         }
         Map<Integer, TransactionCoordinatorInfo> result = new HashMap<>();
         admin.lookups()
-                .lookupPartitionedTopicAsync(SystemTopicNames.TRANSACTION_COORDINATOR_ASSIGN.getPartitionedTopicName())
+                .lookupPartitionedTopicAsync(TopicName.TRANSACTION_COORDINATOR_ASSIGN.getPartitionedTopicName())
                 .thenAccept(map -> {
                     map.forEach((topicPartition, brokerServiceUrl) -> {
                         final int coordinatorId = TopicName.getPartitionIndex(topicPartition);
