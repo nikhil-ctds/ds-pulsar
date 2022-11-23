@@ -219,7 +219,7 @@ flexible messaging model and an intuitive client API.</description>
     <!-- test dependencies -->
     <cassandra.version>3.6.0</cassandra.version>
     <disruptor.version>3.4.0</disruptor.version>
-    <testcontainers.version>1.17.2</testcontainers.version>
+    <testcontainers.version>1.17.6</testcontainers.version>
     <hamcrest.version>2.2</hamcrest.version>
 
     <!-- Set docker-java.version to the version of docker-java used in Testcontainers -->
