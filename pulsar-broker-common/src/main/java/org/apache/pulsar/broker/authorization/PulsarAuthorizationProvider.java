@@ -32,6 +32,7 @@ import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.authentication.AuthenticationDataSource;
 import org.apache.pulsar.broker.cache.ConfigurationCacheService;
 import org.apache.pulsar.broker.resources.PulsarResources;
+import org.apache.pulsar.common.events.EventsTopicNames;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.AuthAction;
@@ -177,6 +178,10 @@ public class PulsarAuthorizationProvider implements AuthorizationProvider {
     public CompletableFuture<Boolean> canLookupAsync(TopicName topicName, String role,
             AuthenticationDataSource authenticationData) {
         CompletableFuture<Boolean> finalResult = new CompletableFuture<Boolean>();
+        if (EventsTopicNames.checkTopicIsTransactionCoordinatorAssign(topicName)) {
+            finalResult.complete(true);
+            return finalResult;
+        }
         canProduceAsync(topicName, role, authenticationData).whenComplete((produceAuthorized, ex) -> {
             if (ex == null) {
                 if (produceAuthorized) {
