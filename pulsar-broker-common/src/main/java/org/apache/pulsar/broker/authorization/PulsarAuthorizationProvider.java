@@ -178,10 +178,6 @@ public class PulsarAuthorizationProvider implements AuthorizationProvider {
     public CompletableFuture<Boolean> canLookupAsync(TopicName topicName, String role,
             AuthenticationDataSource authenticationData) {
         CompletableFuture<Boolean> finalResult = new CompletableFuture<Boolean>();
-        if (EventsTopicNames.checkTopicIsTransactionCoordinatorAssign(topicName)) {
-            finalResult.complete(true);
-            return finalResult;
-        }
         canProduceAsync(topicName, role, authenticationData).whenComplete((produceAuthorized, ex) -> {
             if (ex == null) {
                 if (produceAuthorized) {
