@@ -24,10 +24,10 @@ import org.apache.pulsar.common.events.EventsTopicNames;
 import org.apache.pulsar.common.naming.TopicName;
 
 /**
- * Auth implementation that allows clients to use transactions even
+ * Authorization implementation that allows clients to use transactions even
  * if they don't have lookup permissions for the system tenant.
  */
-public class PulsarTransactionsAuthorizationProvider extends PulsarAuthorizationProvider {
+public class AllowSystemTransactionTopicLookupAuthorizationProvider extends PulsarAuthorizationProvider {
 
     @Override
     public CompletableFuture<Boolean> canLookupAsync(TopicName topicName, String role,
