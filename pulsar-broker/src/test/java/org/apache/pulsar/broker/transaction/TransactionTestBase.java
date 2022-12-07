@@ -198,6 +198,7 @@ public abstract class TransactionTestBase extends TestRetrySupport {
             conf.setTransactionCoordinatorEnabled(true);
             conf.setBrokerDeduplicationEnabled(true);
             conf.setSystemTopicEnabled(true);
+            conf.setTopicLevelPoliciesEnabled(true);
             conf.setTransactionBufferSnapshotMaxTransactionCount(2);
             conf.setTransactionBufferSnapshotMinTimeInMillis(2000);
             serviceConfigurationList.add(conf);

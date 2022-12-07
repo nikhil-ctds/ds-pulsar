@@ -896,6 +896,7 @@ public class TransactionTest extends TransactionTestBase {
     public void testAutoCreateSchemaForTransactionSnapshot() throws Exception {
         String namespace = TENANT + "/ns2";
         String topic = namespace + "/test";
+
         pulsarServiceList.forEach((pulsarService ->
                 pulsarService.getConfiguration().setAllowAutoUpdateSchemaEnabled(false)));
         admin.namespaces().createNamespace(namespace);
