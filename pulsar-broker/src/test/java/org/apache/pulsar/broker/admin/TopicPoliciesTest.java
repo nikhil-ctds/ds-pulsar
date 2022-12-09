@@ -3077,4 +3077,22 @@ public class TopicPoliciesTest extends MockedPulsarServiceBaseTest {
                     assertNotEquals(newLac, beforeLac);
                 });
     }
+
+    @Test
+    public void testGetTopicPoliciesWhenDeleteTopicPolicy() throws Exception {
+        admin.topics().createNonPartitionedTopic(persistenceTopic);
+        admin.topicPolicies().setMaxConsumers(persistenceTopic, 5);
+
+        int maxConsumerPerTopic = pulsar
+                .getTopicPoliciesService()
+                .getTopicPoliciesBypassCacheAsync(TopicName.get(persistenceTopic)).get()
+                .getMaxConsumerPerTopic();
+
+        assertEquals(maxConsumerPerTopic, 5);
+        admin.topics().delete(persistenceTopic, true);
+        TopicPolicies topicPolicies =pulsar.getTopicPoliciesService()
+                .getTopicPoliciesBypassCacheAsync(TopicName.get(persistenceTopic)).get(5, TimeUnit.SECONDS);
+        assertNull(topicPolicies);
+    }
+
 }
