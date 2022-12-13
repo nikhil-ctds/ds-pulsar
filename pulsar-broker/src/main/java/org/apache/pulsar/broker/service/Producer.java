@@ -85,6 +85,7 @@ public class Producer {
     private final String remoteCluster;
     private final boolean isNonPersistentTopic;
     private final boolean isEncrypted;
+    private final boolean blockTransactionsIfReplicationEnabled;
 
     private final ProducerAccessMode accessMode;
     private Optional<Long> topicEpoch;
@@ -149,6 +150,7 @@ public class Producer {
         this.schemaVersion = schemaVersion;
         this.accessMode = accessMode;
         this.topicEpoch = topicEpoch;
+        this.blockTransactionsIfReplicationEnabled = serviceConf.isBlockTransactionsIfReplicationEnabled();
 
         this.clientAddress = cnx.clientSourceAddress();
     }
@@ -241,6 +243,19 @@ public class Producer {
         }
 
         startPublishOperation((int) batchSize, headersAndPayload.readableBytes());
+        return true;
+    }
+
+    private boolean checkCanProduceTxnOnTopic(long sequenceId, ByteBuf headersAndPayload) {
+        if (blockTransactionsIfReplicationEnabled && topic.isReplicated()) {
+            cnx.execute(() -> {
+                cnx.getCommandSender().sendSendError(producerId,
+                        sequenceId, ServerError.NotAllowedError,
+                        "Transactions are not allowed in a namespace with replication enabled");
+                cnx.completedSendOperation(isNonPersistentTopic, headersAndPayload.readableBytes());
+            });
+            return false;
+        }
         return true;
     }
 
@@ -729,6 +744,9 @@ public class Producer {
 
     public void publishTxnMessage(TxnID txnID, long producerId, long sequenceId, long highSequenceId,
                                   ByteBuf headersAndPayload, long batchSize, boolean isChunked, boolean isMarker) {
+        if (!checkCanProduceTxnOnTopic(sequenceId, headersAndPayload)) {
+            return;
+        }
         checkAndStartPublish(producerId, sequenceId, headersAndPayload, batchSize);
         topic.publishTxnMessage(txnID, headersAndPayload,
                 MessagePublishContext.get(this, sequenceId, highSequenceId, msgIn,
