@@ -61,7 +61,9 @@ import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.mledger.LedgerOffloader;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.util.ZkUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.pulsar.broker.BrokerTestUtil;
+import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.admin.v1.Namespaces;
 import org.apache.pulsar.broker.admin.v1.PersistentTopics;
 import org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest;
@@ -194,7 +196,12 @@ public class NamespacesTest extends MockedPulsarServiceBaseTest {
                 .validateNamespacePolicyOperation(NamespaceName.get("other-tenant/use/test-namespace-1"),
                         PolicyName.RETENTION, PolicyOperation.WRITE);
 
-        nsSvc = pulsar.getNamespaceService();
+        nsSvc = spy(pulsar.getNamespaceService());
+        FieldUtils.writeField(
+                FieldUtils.getField(PulsarService.class, "nsService", true),
+                pulsar,
+                nsSvc
+        );
     }
 
     @Override
