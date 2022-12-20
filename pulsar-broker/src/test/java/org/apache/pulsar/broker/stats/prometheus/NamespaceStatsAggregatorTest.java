@@ -20,11 +20,7 @@ package org.apache.pulsar.broker.stats.prometheus;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerMBeanImpl;
 import org.apache.bookkeeper.mledger.util.StatsBuckets;
@@ -41,11 +37,9 @@ import org.apache.pulsar.common.policies.data.BacklogQuota;
 import org.apache.pulsar.common.policies.data.stats.ConsumerStatsImpl;
 import org.apache.pulsar.common.policies.data.stats.SubscriptionStatsImpl;
 import org.apache.pulsar.common.policies.data.stats.TopicStatsImpl;
-import org.apache.pulsar.common.util.SimpleTextOutputStream;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 import org.apache.pulsar.metadata.impl.ZKMetadataStore;
 import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -100,9 +94,7 @@ public class NamespaceStatsAggregatorTest {
         Consumer consumer = Mockito.mock(Consumer.class);
         ConsumerStatsImpl consumerStats = new ConsumerStatsImpl();
         when(consumer.getStats()).thenReturn(consumerStats);
-        List<Consumer> consumers = new ArrayList<>();
-        consumers.add(consumer);
-        when(subscription.getConsumers()).thenReturn(consumers);
+        when(subscription.getConsumers()).thenReturn(Arrays.asList(consumer));
         subscriptionsMaps.put("my-subscription", subscription);
         SubscriptionStatsImpl subStats = new SubscriptionStatsImpl();
         TopicStatsImpl topicStats = new TopicStatsImpl();
@@ -114,8 +106,7 @@ public class NamespaceStatsAggregatorTest {
         when(topic.getManagedLedger()).thenReturn(ml);
         when(topic.getBacklogQuota(Mockito.any())).thenReturn(Mockito.mock(BacklogQuota.class));
         topicsMap.put("my-topic", topic);
-        ByteBuf buf = ByteBufAllocator.DEFAULT.heapBuffer();
-        SimpleTextOutputStream metricStreams = new SimpleTextOutputStream(buf);
+        PrometheusMetricStreams metricStreams = Mockito.spy(new PrometheusMetricStreams());
 
         // Populate subscriptions stats
         subStats.blockedSubscriptionOnUnackedMsgs = true;
@@ -129,25 +120,44 @@ public class NamespaceStatsAggregatorTest {
                 true, true, metricStreams);
 
         // then
-        String metricStreamsString = buf.toString(StandardCharsets.UTF_8);
-        verifySubscriptionMetric(metricStreamsString, "pulsar_subscription_blocked_on_unacked_messages", 1);
-        verifyConsumerMetric(metricStreamsString, "pulsar_consumer_blocked_on_unacked_messages", 0);
+        verifySubscriptionMetric(metricStreams, "pulsar_subscription_blocked_on_unacked_messages", 1);
+        verifyConsumerMetric(metricStreams, "pulsar_consumer_blocked_on_unacked_messages", 0);
 
-        verifySubscriptionMetric(metricStreamsString, "pulsar_subscription_msg_rate_redeliver", 0.7);
-        verifySubscriptionMetric(metricStreamsString, "pulsar_subscription_unacked_messages", 1L);
+        verifySubscriptionMetric(metricStreams, "pulsar_subscription_msg_rate_redeliver", 0.7);
+        verifySubscriptionMetric(metricStreams, "pulsar_subscription_unacked_messages", 1L);
     }
 
-    private void verifySubscriptionMetric(String metricStreamsString, String metricName, Number value) {
-        String metricLine = String.format("%s"
-                + "{cluster=\"\",namespace=\"tenant/cluster/ns\",topic=\"my-topic\",partition=\"-1\","
-                + "subscription=\"my-subscription\"} %s", metricName, value);
-        Assert.assertTrue(metricStreamsString.contains(metricLine));
+    private void verifySubscriptionMetric(PrometheusMetricStreams metricStreams, String metricName, Number value) {
+        Mockito.verify(metricStreams).writeSample(metricName,
+                value,
+                "cluster",
+                null,
+                "namespace",
+                "tenant/cluster/ns",
+                "topic",
+                "my-topic",
+                "partition",
+                "-1",
+                "subscription",
+                "my-subscription");
     }
 
-    private void verifyConsumerMetric(String metricStreamsString, String metricName, Number value) {
-        String metricLine = String.format("%s"
-                + "{cluster=\"\",namespace=\"tenant/cluster/ns\",topic=\"my-topic\",partition=\"-1\","
-                + "subscription=\"my-subscription\",consumer_name=\"\",consumer_id=\"0\"} %s", metricName, value);
-        Assert.assertTrue(metricStreamsString.contains(metricLine));
+    private void verifyConsumerMetric(PrometheusMetricStreams metricStreams, String metricName, Number value) {
+        Mockito.verify(metricStreams).writeSample(metricName,
+                value,
+                "cluster",
+                null,
+                "namespace",
+                "tenant/cluster/ns",
+                "topic",
+                "my-topic",
+                "partition",
+                "-1",
+                "subscription",
+                "my-subscription",
+                "consumer_name",
+                null,
+                "consumer_id",
+                "0");
     }
 }
