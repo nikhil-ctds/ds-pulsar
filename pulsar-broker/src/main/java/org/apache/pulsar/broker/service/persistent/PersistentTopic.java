@@ -1211,9 +1211,9 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                                                                     topic, exception.getMessage());
                                                             deleteLedgerComplete(ctx);
                                                         } else {
-                                                            unfenceTopicToResume();
                                                             log.error("[{}] Error deleting topic",
                                                                     topic, exception);
+                                                            unfenceTopicToResume();
                                                             deleteFuture.completeExceptionally(
                                                                     new PersistenceException(exception));
                                                         }
@@ -1237,6 +1237,11 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 });
 
                 return deleteFuture;
+                }).whenComplete((value, ex) -> {
+                    if (ex != null) {
+                        log.error("[{}] Error deleting topic", topic, ex);
+                        unfenceTopicToResume();
+                    }
                 });
         } finally {
             lock.writeLock().unlock();
