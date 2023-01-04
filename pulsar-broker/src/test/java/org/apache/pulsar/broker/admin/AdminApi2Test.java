@@ -1500,6 +1500,7 @@ public class AdminApi2Test extends MockedPulsarServiceBaseTest {
         stopBroker();
         conf.setSystemTopicEnabled(true);
         conf.setTopicLevelPoliciesEnabled(true);
+        conf.setForceDeleteNamespaceAllowed(true);
         setup();
 
         String tenant = "test-tenant";
@@ -1739,6 +1740,9 @@ public class AdminApi2Test extends MockedPulsarServiceBaseTest {
 
     @Test
     public void testForceDeleteNamespace() throws Exception {
+        stopBroker();
+        conf.setForceDeleteNamespaceAllowed(true);
+        setup();
         final String namespaceName = "prop-xyz2/ns1";
         TenantInfoImpl tenantInfo = new TenantInfoImpl(Sets.newHashSet("role1", "role2"), Sets.newHashSet("test"));
         admin.tenants().createTenant("prop-xyz2", tenantInfo);
