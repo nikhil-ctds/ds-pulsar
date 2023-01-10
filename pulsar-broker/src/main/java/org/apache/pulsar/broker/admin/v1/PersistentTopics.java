@@ -277,10 +277,11 @@ public class PersistentTopics extends PersistentTopicsBase {
             @PathParam("property") String property, @PathParam("cluster") String cluster,
             @PathParam("namespace") String namespace, @PathParam("topic") @Encoded String encodedTopic,
             @QueryParam("force") @DefaultValue("false") boolean force,
-            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative,
+            @QueryParam("deleteSchema") @DefaultValue("false") boolean deleteSchema) {
         try {
             validateTopicName(property, cluster, namespace, encodedTopic);
-            internalDeletePartitionedTopic(asyncResponse, authoritative, force);
+            internalDeletePartitionedTopic(asyncResponse, authoritative, force, deleteSchema);
         } catch (WebApplicationException wae) {
             asyncResponse.resume(wae);
         } catch (Exception e) {
@@ -315,9 +316,10 @@ public class PersistentTopics extends PersistentTopicsBase {
     public void deleteTopic(@PathParam("property") String property, @PathParam("cluster") String cluster,
             @PathParam("namespace") String namespace, @PathParam("topic") @Encoded String encodedTopic,
             @QueryParam("force") @DefaultValue("false") boolean force,
-            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative,
+            @QueryParam("deleteSchema") @DefaultValue("false") boolean deleteSchema) {
         validateTopicName(property, cluster, namespace, encodedTopic);
-        internalDeleteTopic(authoritative, force);
+        internalDeleteTopic(authoritative, force, deleteSchema);
     }
 
     @GET
