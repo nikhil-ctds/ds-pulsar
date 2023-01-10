@@ -22,11 +22,9 @@ import static org.apache.pulsar.common.naming.TopicName.PARTITIONED_TOPIC_SUFFIX
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import javax.ws.rs.HEAD;
 import org.apache.bookkeeper.mledger.util.StatsBuckets;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pulsar.broker.service.Consumer;
-import org.apache.pulsar.common.util.SimpleTextOutputStream;
 import org.apache.pulsar.compaction.CompactionRecord;
 import org.apache.pulsar.compaction.CompactorMXBean;
 
@@ -279,13 +277,15 @@ class TopicStats {
                     subsStats.consumersCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
 
             writeSubscriptionMetric(stream, "pulsar_subscription_filter_processed_msg_count",
-                    subsStats.filterProcessedMsgCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                    subsStats.filterProcessedMsgCount, cluster, namespace, topic, sub,
+                    splitTopicAndPartitionIndexLabel);
             writeSubscriptionMetric(stream, "pulsar_subscription_filter_accepted_msg_count",
                     subsStats.filterAcceptedMsgCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
             writeSubscriptionMetric(stream, "pulsar_subscription_filter_rejected_msg_count",
                     subsStats.filterRejectedMsgCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
             writeSubscriptionMetric(stream, "pulsar_subscription_filter_rescheduled_msg_count",
-                    subsStats.filterRescheduledMsgCount, cluster, namespace, topic, sub, splitTopicAndPartitionIndexLabel);
+                    subsStats.filterRescheduledMsgCount, cluster, namespace, topic, sub,
+                    splitTopicAndPartitionIndexLabel);
 
 
             subsStats.consumerStat.forEach((c, consumerStats) -> {
