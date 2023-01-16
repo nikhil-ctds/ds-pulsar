@@ -1460,9 +1460,6 @@ public class AdminApi2Test extends MockedPulsarServiceBaseTest {
         admin.topics().createPartitionedTopic(topic, 10);
         assertFalse(admin.topics().getList(namespace).isEmpty());
 
-        // Wait for change event topic and compaction create finish.
-        awaitChangeEventTopicAndCompactionCreateFinish(namespace, String.format("persistent://%s", topic));
-
         try {
             admin.namespaces().deleteNamespace(namespace, false);
             fail("should have failed due to namespace not empty");
@@ -1491,49 +1488,6 @@ public class AdminApi2Test extends MockedPulsarServiceBaseTest {
         internalCleanup();
         setNamespaceAttr(originalNamespaceAttr);
         setup();
-    }
-
-    private void awaitChangeEventTopicAndCompactionCreateFinish(String ns, String topic) throws Exception {
-        if (!pulsar.getConfiguration().isSystemTopicEnabled()){
-            return;
-        }
-        // Trigger change event topic create.
-        SubscribeRate subscribeRate = new SubscribeRate(-1, 60);
-        admin.topicPolicies().setSubscribeRate(topic, subscribeRate);
-        // Wait for change event topic and compaction create finish.
-        String allowAutoTopicCreationType = pulsar.getConfiguration().getAllowAutoTopicCreationType();
-        int defaultNumPartitions = pulsar.getConfiguration().getDefaultNumPartitions();
-        ArrayList<String> expectChangeEventTopics = new ArrayList<>();
-        if ("non-partitioned".equals(allowAutoTopicCreationType)){
-            String t = String.format("persistent://%s/%s", ns, NAMESPACE_EVENTS_LOCAL_NAME);
-            expectChangeEventTopics.add(t);
-        } else {
-            for (int i = 0; i < defaultNumPartitions; i++){
-                String t = String.format("persistent://%s/%s-partition-%s", ns, NAMESPACE_EVENTS_LOCAL_NAME, i);
-                expectChangeEventTopics.add(t);
-            }
-        }
-        Awaitility.await().until(() -> {
-            boolean finished = true;
-            for (String changeEventTopicName : expectChangeEventTopics){
-                CompletableFuture<Optional<Topic>> completableFuture = pulsar.getBrokerService().getTopic(changeEventTopicName, false);
-                if (completableFuture == null){
-                    finished = false;
-                }
-                Optional<Topic> optionalTopic = completableFuture.get();
-                if (!optionalTopic.isPresent()){
-                    finished = false;
-                }
-                PersistentTopic changeEventTopic = (PersistentTopic) optionalTopic.get();
-                if (!changeEventTopic.isCompactionEnabled()){
-                    continue;
-                }
-                if (!changeEventTopic.getSubscriptions().containsKey(COMPACTION_SUBSCRIPTION)){
-                    finished = false;
-                }
-            }
-            return finished;
-        });
     }
 
     @Test
