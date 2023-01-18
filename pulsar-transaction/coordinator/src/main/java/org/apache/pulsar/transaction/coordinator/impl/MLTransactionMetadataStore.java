@@ -108,8 +108,7 @@ public class MLTransactionMetadataStore
                     .CoordinatorNotFoundException("transaction metadata store with tcId "
                             + tcID.toString() + " change state to Initializing error when init it"));
         } else {
-            internalPinnedExecutor.execute(() -> transactionLog.replayAsync(new TransactionLogReplayCallback() {
-
+            FutureUtil.safeRunAsync(() -> transactionLog.replayAsync(new TransactionLogReplayCallback() {
                 @Override
                 public void replayComplete() {
                     recoverTracker.appendOpenTransactionToTimeoutTracker();
@@ -199,7 +198,7 @@ public class MLTransactionMetadataStore
                         log.error(e.getMessage(), e);
                     }
                 }
-            }));
+            }), internalPinnedExecutor, completableFuture);
         }
         return completableFuture;
     }
@@ -224,7 +223,7 @@ public class MLTransactionMetadataStore
     @Override
     public CompletableFuture<TxnID> newTransaction(long timeOut, String owner) {
         CompletableFuture<TxnID> completableFuture = new CompletableFuture<>();
-        internalPinnedExecutor.execute(() -> {
+        FutureUtil.safeRunAsync(() -> {
             if (!checkIfReady()) {
                 completableFuture.completeExceptionally(new CoordinatorException
                         .TransactionMetadataStoreStateException(tcID, State.Ready, getState(), "new Transaction"));
@@ -266,18 +265,18 @@ public class MLTransactionMetadataStore
                             completableFuture.complete(txnID);
                         }
                     });
-        });
+        }, internalPinnedExecutor, completableFuture);
         return completableFuture;
     }
 
     @Override
     public CompletableFuture<Void> addProducedPartitionToTxn(TxnID txnID, List<String> partitions) {
         CompletableFuture<Void> promise = new CompletableFuture<>();
-        internalPinnedExecutor.execute(() -> {
+        FutureUtil.safeRunAsync(() -> {
             if (!checkIfReady()) {
                 promise
                         .completeExceptionally(new CoordinatorException.TransactionMetadataStoreStateException(tcID,
-                        State.Ready, getState(), "add produced partition"));
+                                State.Ready, getState(), "add produced partition"));
                 return;
             }
             getTxnPositionPair(txnID).thenCompose(txnMetaListPair -> {
@@ -310,7 +309,7 @@ public class MLTransactionMetadataStore
                 promise.completeExceptionally(ex);
                 return null;
             });
-        });
+        }, internalPinnedExecutor, promise);
         return promise;
     }
 
@@ -318,7 +317,7 @@ public class MLTransactionMetadataStore
     public CompletableFuture<Void> addAckedPartitionToTxn(TxnID txnID,
                                                           List<TransactionSubscription> txnSubscriptions) {
         CompletableFuture<Void> promise = new CompletableFuture<>();
-        internalPinnedExecutor.execute(() -> {
+        FutureUtil.safeRunAsync(() -> {
             if (!checkIfReady()) {
                 promise.completeExceptionally(new CoordinatorException
                         .TransactionMetadataStoreStateException(tcID, State.Ready, getState(), "add acked partition"));
@@ -354,7 +353,7 @@ public class MLTransactionMetadataStore
                 promise.completeExceptionally(ex);
                 return null;
             });
-        });
+        }, internalPinnedExecutor, promise);
         return promise;
     }
 
@@ -362,7 +361,7 @@ public class MLTransactionMetadataStore
     public CompletableFuture<Void> updateTxnStatus(TxnID txnID, TxnStatus newStatus,
                                                                 TxnStatus expectedStatus, boolean isTimeout) {
         CompletableFuture<Void> promise = new CompletableFuture<>();
-        internalPinnedExecutor.execute(() -> {
+        FutureUtil.safeRunAsync(() -> {
             if (!checkIfReady()) {
                 promise.completeExceptionally(new CoordinatorException
                         .TransactionMetadataStoreStateException(tcID,
@@ -423,7 +422,7 @@ public class MLTransactionMetadataStore
                 promise.completeExceptionally(ex);
                 return null;
             });
-        });
+        }, internalPinnedExecutor, promise);
        return promise;
     }
 
