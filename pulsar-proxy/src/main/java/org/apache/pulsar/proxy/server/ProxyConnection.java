@@ -42,7 +42,6 @@ import javax.naming.AuthenticationException;
 import javax.net.ssl.SSLSession;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarServerException;
-import org.apache.pulsar.broker.authentication.AuthenticationDataSource;
 import org.apache.pulsar.broker.authentication.AuthenticationProvider;
 import org.apache.pulsar.broker.authentication.AuthenticationState;
 import org.apache.pulsar.client.api.Authentication;
@@ -82,7 +81,6 @@ public class ProxyConnection extends PulsarHandler {
             new AtomicLong(ThreadLocalRandom.current().nextLong(0, Long.MAX_VALUE / 2));
     private final ProxyService service;
     private final DnsAddressResolverGroup dnsAddressResolverGroup;
-    AuthenticationDataSource authenticationData;
     private State state;
 
     private LookupProxyHandler lookupProxyHandler = null;
@@ -480,7 +478,6 @@ public class ProxyConnection extends PulsarHandler {
             }
 
             authState = authenticationProvider.newAuthState(clientData, remoteAddress, sslSession);
-            authenticationData = authState.getAuthDataSource();
             doAuthentication(clientData);
         } catch (Exception e) {
             LOG.warn("[{}] Unable to authenticate: ", remoteAddress, e);
