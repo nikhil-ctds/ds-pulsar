@@ -728,7 +728,7 @@ public class ServerCnxTest {
 
         Object response3 = getResponse();
         assertTrue(response3 instanceof CommandError);
-        assertEquals(((CommandError) response3).getMessage(), "Do not pass");
+        assertEquals(((CommandError) response3).getMessage(), "Unable to authenticate");
         assertEquals(serverCnx.getState(), State.Failed);
         assertFalse(serverCnx.isActive());
         channel.finish();

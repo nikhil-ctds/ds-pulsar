@@ -966,7 +966,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             service.getPulsarStats().recordConnectionCreateFail();
             state = State.Failed;
             log.warn("[{}] Authentication failed: {} ", remoteAddress, e.getMessage());
-            ctx.writeAndFlush(Commands.newError(-1, ServerError.AuthenticationError, e.getMessage()));
+            ctx.writeAndFlush(Commands.newError(-1, ServerError.AuthenticationError, "Unable to authenticate"));
             close();
         } catch (Exception e) {
             service.getPulsarStats().recordConnectionCreateFail();
