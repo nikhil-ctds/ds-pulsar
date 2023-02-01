@@ -259,13 +259,9 @@ public class ProxyConnection extends PulsarHandler {
         }
     }
 
-    private synchronized void completeConnect(AuthData clientData) throws PulsarClientException {
+    private synchronized void completeConnect() throws PulsarClientException {
         Supplier<ClientCnx> clientCnxSupplier;
         if (service.getConfiguration().isAuthenticationEnabled()) {
-            if (service.getConfiguration().isForwardAuthorizationCredentials()) {
-                this.clientAuthData = clientData;
-                this.clientAuthMethod = authMethod;
-            }
             clientCnxSupplier = () -> new ProxyClientCnx(clientConf, service.getWorkerGroup(), clientAuthRole,
                     clientAuthData, clientAuthMethod, protocolVersionToAdvertise,
                     service.getConfiguration().isForwardAuthorizationCredentials(), this);
@@ -384,29 +380,51 @@ public class ProxyConnection extends PulsarHandler {
     // According to auth result, send newConnected or newAuthChallenge command.
     private void doAuthentication(AuthData clientData)
             throws Exception {
-        AuthData brokerData = authState.authenticate(clientData);
-        // authentication has completed, will send newConnected command.
-        if (authState.isComplete()) {
-            clientAuthRole = authState.getAuthRole();
+        authState
+                .authenticateAsync(clientData)
+                .whenCompleteAsync((authChallenge, throwable) -> {
+                    if (throwable == null) {
+                        authChallengeSuccessCallback(authChallenge);
+                    } else {
+                        authenticationFailedCallback(throwable);
+                    }
+                    }, ctx.executor());
+    }
+
+    protected void authenticationFailedCallback(Throwable t) {
+        LOG.warn("[{}] Unable to authenticate: ", remoteAddress, t);
+        ctx.writeAndFlush(Commands.newError(-1, ServerError.AuthenticationError, "Failed to authenticate"))
+                .addListener(ChannelFutureListener.CLOSE);
+    }
+
+    // Always run in this class's event loop.
+    protected void authChallengeSuccessCallback(AuthData authChallenge) {
+        try {
+            // authentication has completed, will send newConnected command.
+            if (authChallenge == null) {
+                clientAuthRole = authState.getAuthRole();
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("[{}] Client successfully authenticated with {} role {}",
+                            remoteAddress, authMethod, clientAuthRole);
+                }
+
+                // First connection
+                if (this.connectionPool == null || state == State.Connecting) {
+                    // authentication has completed, will send newConnected command.
+                    completeConnect();
+                }
+                return;
+            }
+
+            // auth not complete, continue auth with client side.
+            ctx.writeAndFlush(Commands.newAuthChallenge(authMethod, authChallenge, protocolVersionToAdvertise))
+                    .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("[{}] Client successfully authenticated with {} role {}",
-                        remoteAddress, authMethod, clientAuthRole);
+                LOG.debug("[{}] Authentication in progress client by method {}.",
+                        remoteAddress, authMethod);
             }
-
-            // First connection
-            if (this.connectionPool == null || state == State.Connecting) {
-                // authentication has completed, will send newConnected command.
-                completeConnect(clientData);
-            }
-            return;
-        }
-
-        // auth not complete, continue auth with client side.
-        ctx.writeAndFlush(Commands.newAuthChallenge(authMethod, brokerData, protocolVersionToAdvertise))
-                .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("[{}] Authentication in progress client by method {}.",
-                    remoteAddress, authMethod);
+        } catch (Exception e) {
+            authenticationFailedCallback(e);
         }
     }
 
@@ -441,7 +459,7 @@ public class ProxyConnection extends PulsarHandler {
 
             // authn not enabled, complete
             if (!service.getConfiguration().isAuthenticationEnabled()) {
-                completeConnect(null);
+                completeConnect();
                 return;
             }
 
@@ -455,6 +473,14 @@ public class ProxyConnection extends PulsarHandler {
                 authMethod = "none";
             }
 
+            if (service.getConfiguration().isForwardAuthorizationCredentials()) {
+                // We store the first clientData here. Before this commit, we stored the last clientData.
+                // Since this only works when forwarding single staged authentication, first == last is true.
+                // Here is an issue to fix the protocol: https://github.com/apache/pulsar/issues/19291.
+                this.clientAuthData = clientData;
+                this.clientAuthMethod = authMethod;
+            }
+
             authenticationProvider = service
                 .getAuthenticationService()
                 .getAuthenticationProvider(authMethod);
@@ -466,7 +492,7 @@ public class ProxyConnection extends PulsarHandler {
                     .orElseThrow(() ->
                         new AuthenticationException("No anonymous role, and no authentication provider configured"));
 
-                completeConnect(clientData);
+                completeConnect();
                 return;
             }
 
@@ -480,9 +506,7 @@ public class ProxyConnection extends PulsarHandler {
             authState = authenticationProvider.newAuthState(clientData, remoteAddress, sslSession);
             doAuthentication(clientData);
         } catch (Exception e) {
-            LOG.warn("[{}] Unable to authenticate: ", remoteAddress, e);
-            ctx.writeAndFlush(Commands.newError(-1, ServerError.AuthenticationError, "Failed to authenticate"))
-                    .addListener(ChannelFutureListener.CLOSE);
+            authenticationFailedCallback(e);
         }
     }
 
