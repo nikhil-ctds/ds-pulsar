@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.LongAdder;
 import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.transaction.TransactionCoordinatorClientException;
@@ -143,8 +144,11 @@ public class MLTransactionMetadataStore
                                     positions.add(position);
                                     long openTimestamp = transactionMetadataEntry.getStartTime();
                                     long timeoutAt = transactionMetadataEntry.getTimeoutMs();
-                                    txnMetaMap.put(transactionId, MutablePair.of(new TxnMetaImpl(txnID,
-                                            openTimestamp, timeoutAt), positions));
+                                    final String owner = transactionMetadataEntry.hasOwner()
+                                            ? transactionMetadataEntry.getOwner() : null;
+                                    final TxnMetaImpl left = new TxnMetaImpl(txnID,
+                                            openTimestamp, timeoutAt, owner);
+                                    txnMetaMap.put(transactionId, MutablePair.of(left, positions));
                                     recoverTracker.handleOpenStatusTransaction(txnSequenceId,
                                             timeoutAt + openTimestamp);
                                 }
@@ -218,7 +222,7 @@ public class MLTransactionMetadataStore
     }
 
     @Override
-    public CompletableFuture<TxnID> newTransaction(long timeOut) {
+    public CompletableFuture<TxnID> newTransaction(long timeOut, String owner) {
         CompletableFuture<TxnID> completableFuture = new CompletableFuture<>();
         internalPinnedExecutor.execute(() -> {
             if (!checkIfReady()) {
@@ -239,13 +243,20 @@ public class MLTransactionMetadataStore
                     .setMetadataOp(TransactionMetadataEntry.TransactionMetadataOp.NEW)
                     .setLastModificationTime(currentTimeMillis)
                     .setMaxLocalTxnId(sequenceIdGenerator.getCurrentSequenceId());
+            if (owner != null) {
+                if (StringUtils.isBlank(owner)) {
+                    completableFuture.completeExceptionally(new IllegalArgumentException("Owner can't be blank"));
+                    return;
+                }
+                transactionMetadataEntry.setOwner(owner);
+            }
             transactionLog.append(transactionMetadataEntry)
                     .whenComplete((position, throwable) -> {
                         if (throwable != null) {
                             completableFuture.completeExceptionally(throwable);
                         } else {
                             appendLogCount.increment();
-                            TxnMeta txn = new TxnMetaImpl(txnID, currentTimeMillis, timeOut);
+                            TxnMeta txn = new TxnMetaImpl(txnID, currentTimeMillis, timeOut, owner);
                             List<Position> positions = new ArrayList<>();
                             positions.add(position);
                             Pair<TxnMeta, List<Position>> pair = MutablePair.of(txn, positions);
@@ -289,9 +300,9 @@ public class MLTransactionMetadataStore
                                 promise.complete(null);
                             } catch (InvalidTxnStatusException e) {
                                 transactionLog.deletePosition(Collections.singletonList(position));
-                                log.error("TxnID : " + txnMetaListPair.getLeft().id().toString()
-                                        + " add produced partition error with TxnStatus : "
-                                        + txnMetaListPair.getLeft().status().name(), e);
+                                log.error("TxnID {} add produced partition error"
+                                                + " with TxnStatus: {}", txnMetaListPair.getLeft().id().toString()
+                                        , txnMetaListPair.getLeft().status().name(), e);
                                 promise.completeExceptionally(e);
                             }
                         });

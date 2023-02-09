@@ -121,18 +121,8 @@ public abstract class TransactionTestBase extends TestRetrySupport {
         if (pulsarClient != null) {
             pulsarClient.shutdown();
         }
-        pulsarClient = createNewPulsarClient(PulsarClient.builder()
-                .serviceUrl(pulsarServiceList.get(0).getBrokerServiceUrl()));
+        pulsarClient = PulsarClient.builder().serviceUrl(pulsarServiceList.get(0).getBrokerServiceUrl()).build();
     }
-
-    protected PulsarClient createNewPulsarClient(ClientBuilder clientBuilder) throws PulsarClientException {
-        return clientBuilder.build();
-    }
-
-    protected PulsarAdmin createNewPulsarAdmin(PulsarAdminBuilder builder) throws PulsarClientException {
-        return builder.build();
-    }
-
 
     private void init() throws Exception {
         mockZooKeeper = createMockZooKeeper();
@@ -144,6 +134,15 @@ public abstract class TransactionTestBase extends TestRetrySupport {
         mockBookKeeper = createMockBookKeeper(bkExecutor);
         startBroker();
     }
+
+    protected PulsarClient createNewPulsarClient(ClientBuilder clientBuilder) throws PulsarClientException {
+        return clientBuilder.build();
+    }
+
+    protected PulsarAdmin createNewPulsarAdmin(PulsarAdminBuilder builder) throws PulsarClientException {
+        return builder.build();
+    }
+
     protected void setUpBase(int numBroker,int numPartitionsOfTC, String topic, int numPartitions) throws Exception{
         setBrokerCount(numBroker);
         internalSetup();
@@ -170,11 +169,10 @@ public abstract class TransactionTestBase extends TestRetrySupport {
         if (pulsarClient != null) {
             pulsarClient.shutdown();
         }
-        pulsarClient = PulsarClient.builder()
+        pulsarClient = createNewPulsarClient(PulsarClient.builder()
                 .serviceUrl(getPulsarServiceList().get(0).getBrokerServiceUrl())
                 .statsInterval(0, TimeUnit.SECONDS)
-                .enableTransaction(true)
-                .build();
+                .enableTransaction(true));
     }
 
     protected void startBroker() throws Exception {
