@@ -159,6 +159,7 @@ public class AutoClusterFailover implements ServiceUrlProvider {
             }
 
             pulsarClient.updateServiceUrl(target);
+            pulsarClient.reloadLookUp();
             currentPulsarServiceUrl = target;
         } catch (IOException e) {
             log.error("Current Pulsar service is {}, "
