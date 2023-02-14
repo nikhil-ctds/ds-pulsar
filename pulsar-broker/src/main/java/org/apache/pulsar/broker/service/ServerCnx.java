@@ -749,7 +749,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                     log.debug("[{}] Authentication in progress client by method {}.", remoteAddress, authMethod);
                 }
             }
-        } catch (Exception e) {
+        } catch (Exception | AssertionError e) {
             authenticationFailed(e);
         }
     }
@@ -776,7 +776,7 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
                                         remoteAddress, originalPrincipal);
                             }
                             completeConnect(clientProtoVersion, clientVersion);
-                        } catch (Exception e) {
+                        } catch (Exception | AssertionError e) {
                             authenticationFailed(e);
                         }
                     }
