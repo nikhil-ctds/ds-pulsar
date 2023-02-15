@@ -73,8 +73,6 @@ import org.testng.annotations.Test;
 @Test(groups = "broker")
 public class AuthenticatedTransactionProducerConsumerTest extends TransactionTestBase {
 
-    private static final String CONSUME_TOPIC = "persistent://public/txn/txn-consume-test";
-
     private static final String TOPIC = NAMESPACE1 + "/txn-auth";
     private final String ADMIN_TOKEN;
     private final String TOKEN_PUBLIC_KEY;
@@ -176,14 +174,14 @@ public class AuthenticatedTransactionProducerConsumerTest extends TransactionTes
         @Cleanup final Consumer<String> consumer = pulsarClient
                 .newConsumer(Schema.STRING)
                 .subscriptionName("test")
-                .topic(CONSUME_TOPIC)
+                .topic(TOPIC)
                 .subscribe();
 
 
         @Cleanup final Producer<String> producer = pulsarClient
                 .newProducer(Schema.STRING)
                 .sendTimeout(60, TimeUnit.SECONDS)
-                .topic(CONSUME_TOPIC)
+                .topic(TOPIC)
                 .create();
 
         producer.newMessage().value("message").send();
