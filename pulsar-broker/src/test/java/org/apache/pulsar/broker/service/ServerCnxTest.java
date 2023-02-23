@@ -19,6 +19,7 @@
 package org.apache.pulsar.broker.service;
 
 import static org.apache.pulsar.broker.BrokerTestUtil.spyWithClassAndConstructorArgs;
+import static org.apache.pulsar.broker.BrokerTestUtil.spyWithClassAndConstructorArgsRecordingInvocations;
 import static org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest.createMockBookKeeper;
 import static org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest.createMockZooKeeper;
 import static org.mockito.ArgumentMatchers.any;
@@ -783,7 +784,7 @@ public class ServerCnxTest {
 
         svcConfig.setAuthorizationProvider("org.apache.pulsar.broker.auth.MockAuthorizationProvider");
         AuthorizationService authorizationService =
-                spyWithClassAndConstructorArgs(AuthorizationService.class, svcConfig,
+                spyWithClassAndConstructorArgsRecordingInvocations(AuthorizationService.class, svcConfig,
                         pulsar.getPulsarResources());
         when(brokerService.getAuthorizationService()).thenReturn(authorizationService);
         svcConfig.setAuthorizationEnabled(true);
@@ -878,7 +879,7 @@ public class ServerCnxTest {
 
         svcConfig.setAuthorizationProvider("org.apache.pulsar.broker.auth.MockAuthorizationProvider");
         AuthorizationService authorizationService =
-                spyWithClassAndConstructorArgs(AuthorizationService.class, svcConfig,
+                spyWithClassAndConstructorArgsRecordingInvocations(AuthorizationService.class, svcConfig,
                         pulsar.getPulsarResources());
         when(brokerService.getAuthorizationService()).thenReturn(authorizationService);
         svcConfig.setAuthorizationEnabled(true);
@@ -976,7 +977,7 @@ public class ServerCnxTest {
 
         svcConfig.setAuthorizationProvider("org.apache.pulsar.broker.auth.MockAuthorizationProvider");
         AuthorizationService authorizationService =
-                spyWithClassAndConstructorArgs(AuthorizationService.class, svcConfig,
+                spyWithClassAndConstructorArgsRecordingInvocations(AuthorizationService.class, svcConfig,
                         pulsar.getPulsarResources());
         when(brokerService.getAuthorizationService()).thenReturn(authorizationService);
         svcConfig.setAuthorizationEnabled(true);
