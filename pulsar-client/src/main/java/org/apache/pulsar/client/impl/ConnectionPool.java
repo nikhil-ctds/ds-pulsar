@@ -171,8 +171,16 @@ public class ConnectionPool implements AutoCloseable {
 
         final int randomKey = signSafeMod(random.nextInt(), maxConnectionsPerHosts);
 
-        return pool.computeIfAbsent(logicalAddress, a -> new ConcurrentHashMap<>()) //
+        CompletableFuture<ClientCnx> result =  pool.computeIfAbsent(logicalAddress, a -> new ConcurrentHashMap<>()) //
                 .computeIfAbsent(randomKey, k -> createConnection(logicalAddress, physicalAddress, randomKey));
+        if (result.isCompletedExceptionally()) {
+            // we cannot cache a failed connection, so we remove it from the pool
+            // there is a race condition in which
+            // cleanupConnection is called before caching this result
+            // and so the clean up fails
+            cleanupConnection(logicalAddress, randomKey, result);
+        }
+        return result;
     }
 
     private CompletableFuture<ClientCnx> createConnection(InetSocketAddress logicalAddress,
@@ -224,6 +232,10 @@ public class ConnectionPool implements AutoCloseable {
             }).exceptionally(exception -> {
                 log.warn("[{}] Connection handshake failed: {}", cnx.channel(), exception.getMessage());
                 cnxFuture.completeExceptionally(exception);
+                // this cleanupConnection may happen before that the
+                // CompletableFuture is cached into the "pool" map,
+                // it is not enough to clean it here, we need to clean it
+                // in the "pool" map when the CompletableFuture is cached
                 cleanupConnection(logicalAddress, connectionKey, cnxFuture);
                 cnx.ctx().close();
                 return null;
