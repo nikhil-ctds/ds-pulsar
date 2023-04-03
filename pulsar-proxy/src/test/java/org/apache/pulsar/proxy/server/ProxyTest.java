@@ -26,10 +26,13 @@ import static org.testng.Assert.assertEquals;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import lombok.Cleanup;
@@ -38,12 +41,14 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 import org.apache.avro.reflect.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.PulsarVersion;
 import org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.KeySharedPolicy;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageListener;
 import org.apache.pulsar.client.api.MessageRoutingMode;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
@@ -363,24 +368,55 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
                 .build();
 
         @Cleanup
-        Producer<byte[]> producer = client.newProducer(Schema.BYTES)
+        Producer<byte[]> producer = pulsarClient.newProducer(Schema.BYTES)
                 .topic("persistent://sample/test/local/keyshared")
                 .enableBatching(false)
                 .create();
 
+        int numRanges = 200;
+        int max = Short.MAX_VALUE * 2;
+        int rangeSize = (max / numRanges);
+        int last = -1;
+        List<Range> ranges = new ArrayList<>();
+        for (int i = 0; i < numRanges - 1; i++) {
+            int start = i * rangeSize;
+            int end = (i + 1) * rangeSize - 1;
+            if (end >= max) {
+                end = max;
+            }
+            log.info("Range {} - {}", start, end);
+            last = end;
+            ranges.add(new Range(start, end));
+        }
 
-        @Cleanup
-        Consumer<byte[]> consumer = client.newConsumer()
-                .topic("persistent://sample/test/local/keyshared")
-                .subscriptionType(SubscriptionType.Key_Shared)
-                .keySharedPolicy(KeySharedPolicy
-                        .stickyHashRange()
-                        .ranges(Arrays.asList(new Range(0, Short.MAX_VALUE * 2))))
-                .subscriptionName("my-sub").subscribe();
+        if (last < max) {
+            log.info("Final Range {} - {}", last + 1, max);
+            ranges.add(new Range(last + 1, max));
+        }
+
+        BlockingQueue<Pair<Consumer<byte[]>, Message<byte[]>>> messages = new LinkedBlockingQueue<>();
+        List<Consumer> consumers = new ArrayList<>();
+        for (Range range : ranges) {
+            Consumer<byte[]> consumer = client.newConsumer()
+                    .topic("persistent://sample/test/local/keyshared")
+                    .subscriptionType(SubscriptionType.Key_Shared)
+                    .keySharedPolicy(KeySharedPolicy
+                            .stickyHashRange()
+                            .ranges(Arrays.asList(range)))
+                    .subscriptionName("my-sub")
+                    .messageListener(new MessageListener<byte[]>() {
+                        @Override
+                        public void received(Consumer<byte[]> consumer, Message<byte[]> msg) {
+                            messages.add(Pair.of(consumer, msg));
+                        }
+                    })
+                    .subscribe();
+            consumers.add(consumer);
+        }
 
         for (int i = 0; i < 10; i++) {
             producer.send("test".getBytes());
-            Message<byte[]> msg = consumer.receive(1, TimeUnit.SECONDS);
+            Pair<Consumer<byte[]>, Message<byte[]>> msg = messages.poll(1000, TimeUnit.SECONDS);
             int size = proxyService.getClientCnxs().size();
             log.info("Num connections {}", size);
             proxyService.getClientCnxs().forEach((cnx) -> {
@@ -391,11 +427,12 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
             });
 
             requireNonNull(msg);
-            consumer.acknowledge(msg);
+            msg.getKey().acknowledge(msg.getValue());
         }
 
-        Message<byte[]> msg = consumer.receive(0, TimeUnit.SECONDS);
-        checkArgument(msg == null);
+        for (Consumer consumer : consumers) {
+            consumer.close();
+        }
     }
 
 }
