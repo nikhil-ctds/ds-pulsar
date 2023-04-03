@@ -66,6 +66,7 @@ import org.apache.pulsar.common.api.proto.ProtocolVersion;
 import org.apache.pulsar.common.api.proto.ServerError;
 import org.apache.pulsar.common.protocol.Commands;
 import org.apache.pulsar.common.protocol.PulsarHandler;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.Reflections;
 import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
 import org.slf4j.Logger;
@@ -687,9 +688,10 @@ public class ProxyConnection extends PulsarHandler {
     public CompletableFuture<?> onServiceShutdown() {
         LOG.info("[{}] Shutdown connection {} {}", remoteAddress,
                 directProxyHandler, connectionPool);
-
+        if (ctx == null) {
+            return CompletableFuture.completedFuture(null);
+        }
         CompletableFuture<?> handle = new CompletableFuture<>();
-
         ctx.executor().execute(() -> {
             try {
                 if (state == State.Closed) {
@@ -714,6 +716,8 @@ public class ProxyConnection extends PulsarHandler {
                 }
 
                 state = State.Closed;
+
+                ctx.close();
             } finally {
                 handle.complete(null);
             }
