@@ -414,7 +414,7 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
             consumers.add(consumer);
         }
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 100; i++) {
             producer.send("test".getBytes());
             Pair<Consumer<byte[]>, Message<byte[]>> msg = messages.poll(1000, TimeUnit.SECONDS);
             int size = proxyService.getClientCnxs().size();
