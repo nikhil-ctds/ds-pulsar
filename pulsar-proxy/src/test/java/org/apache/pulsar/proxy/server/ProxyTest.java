@@ -25,6 +25,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.testng.Assert.assertEquals;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
+
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -40,10 +42,12 @@ import org.apache.pulsar.PulsarVersion;
 import org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
 import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.KeySharedPolicy;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageRoutingMode;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.Range;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 import org.apache.pulsar.client.api.SubscriptionType;
@@ -349,6 +353,49 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
         });
 
         return new PulsarClientImpl(conf, eventLoopGroup, cnxPool);
+    }
+
+    @Test
+    public void testKeyShared() throws Exception {
+        @Cleanup
+        PulsarClient client = PulsarClient.builder()
+                .serviceUrl(proxyService.getServiceUrl())
+                .build();
+
+        @Cleanup
+        Producer<byte[]> producer = client.newProducer(Schema.BYTES)
+                .topic("persistent://sample/test/local/keyshared")
+                .enableBatching(false)
+                .create();
+
+
+        @Cleanup
+        Consumer<byte[]> consumer = client.newConsumer()
+                .topic("persistent://sample/test/local/keyshared")
+                .subscriptionType(SubscriptionType.Key_Shared)
+                .keySharedPolicy(KeySharedPolicy
+                        .stickyHashRange()
+                        .ranges(Arrays.asList(new Range(0, Short.MAX_VALUE * 2))))
+                .subscriptionName("my-sub").subscribe();
+
+        for (int i = 0; i < 10; i++) {
+            producer.send("test".getBytes());
+            Message<byte[]> msg = consumer.receive(1, TimeUnit.SECONDS);
+            int size = proxyService.getClientCnxs().size();
+            log.info("Num connections {}", size);
+            proxyService.getClientCnxs().forEach((cnx) -> {
+                log.info("Disconnect {}", cnx);
+                cnx.ctx()
+                        .channel()
+                        .disconnect();
+            });
+
+            requireNonNull(msg);
+            consumer.acknowledge(msg);
+        }
+
+        Message<byte[]> msg = consumer.receive(0, TimeUnit.SECONDS);
+        checkArgument(msg == null);
     }
 
 }
