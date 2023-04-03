@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -680,5 +681,45 @@ public class ProxyConnection extends PulsarHandler {
                 && pulsarServiceUrl.length() == expectedPrefix.length() + brokerHostPort.length()
                 && pulsarServiceUrl.startsWith(expectedPrefix)
                 && pulsarServiceUrl.startsWith(brokerHostPort, expectedPrefix.length());
+    }
+
+
+    public CompletableFuture<?> onServiceShutdown() {
+        LOG.info("[{}] Shutdown connection {} {}", remoteAddress,
+                directProxyHandler, connectionPool);
+
+        CompletableFuture<?> handle = new CompletableFuture<>();
+
+        ctx.executor().execute(() -> {
+            try {
+                if (state == State.Closed) {
+                    return;
+                }
+
+                if (directProxyHandler != null) {
+                    directProxyHandler.close();
+                    directProxyHandler = null;
+                }
+
+                service.getClientCnxs().remove(this);
+
+
+                if (connectionPool != null) {
+                    try {
+                        connectionPool.close();
+                        connectionPool = null;
+                    } catch (Exception e) {
+                        LOG.error("Failed to close connection pool {}", e.getMessage(), e);
+                    }
+                }
+
+                state = State.Closed;
+            } finally {
+                handle.complete(null);
+            }
+        });
+
+        return handle;
+
     }
 }

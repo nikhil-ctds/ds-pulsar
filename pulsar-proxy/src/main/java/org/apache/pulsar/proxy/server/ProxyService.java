@@ -33,7 +33,6 @@ import io.netty.resolver.dns.DnsNameResolverBuilder;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -43,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.ServiceConfigurationUtils;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
 import org.apache.pulsar.broker.authorization.AuthorizationService;
@@ -63,6 +64,7 @@ import org.apache.pulsar.client.api.AuthenticationFactory;
 import org.apache.pulsar.client.impl.auth.AuthenticationDisabled;
 import org.apache.pulsar.common.allocator.PulsarByteBufAllocator;
 import org.apache.pulsar.common.configuration.PulsarConfigurationLoader;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.netty.DnsResolverUtil;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.metadata.api.MetadataStoreException;
@@ -75,7 +77,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Pulsar proxy service.
  */
-public class ProxyService implements Closeable {
+@Slf4j
+public class ProxyService {
 
     private final ProxyConfiguration proxyConfig;
     private final Authentication proxyClientAuthentication;
@@ -331,6 +334,7 @@ public class ProxyService implements Closeable {
     }
 
     public void close() throws IOException {
+        log.info("ProxyService shutting down ({} active connections}", clientCnxs.size());
         dnsAddressResolverGroup.close();
 
         if (discoveryProvider != null) {
@@ -344,6 +348,18 @@ public class ProxyService implements Closeable {
         if (listenChannelTls != null) {
             listenChannelTls.close();
         }
+
+        List<CompletableFuture<?>> openConnections = new ArrayList<>();
+        clientCnxs.forEach((cnx) -> {
+            openConnections.add(cnx.onServiceShutdown());
+        });
+        try {
+            FutureUtil
+                    .waitForAll(openConnections)
+                    .get(5, TimeUnit.SECONDS);
+        } catch (Exception ignore) {
+        }
+        log.info("Closed {} connections", openConnections.size());
 
         if (statsExecutor != null) {
             statsExecutor.shutdown();
