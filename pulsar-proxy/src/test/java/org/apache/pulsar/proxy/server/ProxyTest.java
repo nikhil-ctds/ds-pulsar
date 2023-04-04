@@ -362,6 +362,9 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
 
     @Test
     public void testKeyShared() throws Exception {
+
+        admin.topics().createPartitionedTopic("persistent://sample/test/local/keyshared", 10);
+
         @Cleanup
         PulsarClient client = PulsarClient.builder()
                 .serviceUrl(proxyService.getServiceUrl())
@@ -400,6 +403,8 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
             Consumer<byte[]> consumer = client.newConsumer()
                     .topic("persistent://sample/test/local/keyshared")
                     .subscriptionType(SubscriptionType.Key_Shared)
+                    .acknowledgmentGroupTime(0, TimeUnit.SECONDS)
+                    .isAckReceiptEnabled(true)
                     .keySharedPolicy(KeySharedPolicy
                             .stickyHashRange()
                             .ranges(Arrays.asList(range)))
@@ -427,7 +432,11 @@ public class ProxyTest extends MockedPulsarServiceBaseTest {
             });
 
             requireNonNull(msg);
-            msg.getKey().acknowledge(msg.getValue());
+            msg.getKey().acknowledgeAsync(msg.getValue())
+                    .exceptionally(err-> {
+                        log.error("Failed to ack message", err);
+                        return null;
+                    });
         }
 
         for (Consumer consumer : consumers) {
