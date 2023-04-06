@@ -248,8 +248,12 @@ public class KubernetesRuntimeFactory implements RuntimeFactory {
                 throw new IllegalArgumentException("Function authentication provider "
                         + functionAuthProvider.get().getClass().getName() + " must implement KubernetesFunctionAuthProvider");
             } else {
-                KubernetesFunctionAuthProvider kubernetesFunctionAuthProvider = (KubernetesFunctionAuthProvider) functionAuthProvider.get();
-                kubernetesFunctionAuthProvider.initialize(coreClient, serverCaBytes, (funcDetails) -> getRuntimeCustomizer().map((customizer) -> customizer.customizeNamespace(funcDetails, jobNamespace)).orElse(jobNamespace));
+                KubernetesFunctionAuthProvider kubernetesFunctionAuthProvider =
+                        (KubernetesFunctionAuthProvider) functionAuthProvider.get();
+                kubernetesFunctionAuthProvider.initialize(coreClient, serverCaBytes,
+                        (funcDetails) -> getRuntimeCustomizer()
+                                .map((customizer) -> customizer.customizeNamespace(funcDetails, jobNamespace))
+                                .orElse(jobNamespace), factoryConfig.getKubernetesFunctionAuthProviderConfig());
                 this.authProvider = Optional.of(kubernetesFunctionAuthProvider);
             }
         } else {
