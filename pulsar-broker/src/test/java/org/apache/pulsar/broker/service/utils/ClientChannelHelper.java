@@ -19,6 +19,7 @@
 package org.apache.pulsar.broker.service.utils;
 
 import java.util.Queue;
+import org.apache.pulsar.common.api.proto.CommandAddPartitionToTxnResponse;
 import org.apache.pulsar.common.api.proto.CommandAuthChallenge;
 import org.apache.pulsar.common.api.proto.CommandPartitionedTopicMetadataResponse;
 import org.apache.pulsar.common.protocol.PulsarDecoder;
@@ -160,6 +161,12 @@ public class ClientChannelHelper {
         @Override
         protected void handlePartitionResponse(CommandPartitionedTopicMetadataResponse response) {
             queue.offer(new CommandPartitionedTopicMetadataResponse().copyFrom(response));
+        }
+
+        @Override
+        protected void handleAddPartitionToTxnResponse(
+                CommandAddPartitionToTxnResponse commandAddPartitionToTxnResponse) {
+            queue.offer(new CommandAddPartitionToTxnResponse().copyFrom(commandAddPartitionToTxnResponse));
         }
     };
 
