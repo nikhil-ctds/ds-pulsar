@@ -536,7 +536,9 @@ MIT License
     - org.slf4j-jcl-over-slf4j-1.7.32.jar
  * The Checker Framework
     - org.checkerframework-checker-qual-3.12.0.jar
-
+ * Auth0, Inc.
+    - com.auth0-java-jwt-4.3.0.jar
+    - com.auth0-jwks-rsa-0.22.0.jar
 Protocol Buffers License
  * Protocol Buffers
    - com.google.protobuf-protobuf-java-3.19.6.jar -- licenses/LICENSE-protobuf.txt
