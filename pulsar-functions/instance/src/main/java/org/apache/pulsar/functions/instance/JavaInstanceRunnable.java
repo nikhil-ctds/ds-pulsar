@@ -20,14 +20,20 @@
 package org.apache.pulsar.functions.instance;
 
 import static org.apache.pulsar.functions.utils.FunctionCommon.convertFromFunctionDetailsSubscriptionPosition;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
-
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.deser.BeanDeserializer;
 import com.scurrilous.circe.checksum.Crc32cIntChecksum;
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +42,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.jodah.typetools.TypeResolver;
 import org.apache.commons.lang3.StringUtils;
@@ -61,6 +68,7 @@ import org.apache.pulsar.client.impl.schema.ProtobufSchema;
 import org.apache.pulsar.common.functions.ConsumerConfig;
 import org.apache.pulsar.common.functions.FunctionConfig;
 import org.apache.pulsar.common.functions.ProducerConfig;
+import org.apache.pulsar.common.nar.NarClassLoader;
 import org.apache.pulsar.common.protocol.schema.SchemaVersion;
 import org.apache.pulsar.common.schema.KeyValue;
 import org.apache.pulsar.common.schema.KeyValueEncodingType;
@@ -96,6 +104,7 @@ import org.apache.pulsar.functions.source.SingleConsumerPulsarSourceConfig;
 import org.apache.pulsar.functions.source.batch.BatchSourceExecutor;
 import org.apache.pulsar.functions.utils.CryptoUtils;
 import org.apache.pulsar.functions.utils.FunctionCommon;
+import org.apache.pulsar.functions.utils.io.ConnectorUtils;
 import org.apache.pulsar.io.core.Sink;
 import org.apache.pulsar.io.core.Source;
 import org.slf4j.Logger;
@@ -843,8 +852,7 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
             if (sourceSpec.getConfigs().isEmpty()) {
                 this.source.open(new HashMap<>(), contextImpl);
             } else {
-                this.source.open(ObjectMapperFactory.getThreadLocal().readValue(sourceSpec.getConfigs(),
-                        new TypeReference<Map<String, Object>>() {}), contextImpl);
+                this.source.open(parseComponentConfig(sourceSpec.getConfigs()), contextImpl);
             }
             if (this.source instanceof PulsarSource) {
                 contextImpl.setInputConsumers(((PulsarSource) this.source).getInputConsumers());
@@ -856,6 +864,79 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
             Thread.currentThread().setContextClassLoader(this.instanceClassLoader);
         }
     }
+    private Map<String, Object> parseComponentConfig(String connectorConfigs) throws IOException {
+        return parseComponentConfig(connectorConfigs, instanceConfig, componentClassLoader, componentType);
+    }
+
+    static Map<String, Object> parseComponentConfig(String connectorConfigs,
+                                                    InstanceConfig instanceConfig,
+                                                    ClassLoader componentClassLoader,
+                                                    org.apache.pulsar.functions.proto.Function
+                                                            .FunctionDetails.ComponentType componentType)
+            throws IOException {
+        final Map<String, Object> config = ObjectMapperFactory.getThreadLocal()
+                .readValue(connectorConfigs, new TypeReference<Map<String, Object>>() {});
+        if (instanceConfig.isIgnoreUnknownConfigFields() && componentClassLoader instanceof NarClassLoader) {
+            final String configClassName;
+            if (componentType == org.apache.pulsar.functions.proto.Function.FunctionDetails.ComponentType.SOURCE) {
+                configClassName = ConnectorUtils
+                        .getConnectorDefinition((NarClassLoader) componentClassLoader).getSourceConfigClass();
+            } else if (componentType == org.apache.pulsar.functions.proto.Function.FunctionDetails.ComponentType.SINK) {
+                configClassName =  ConnectorUtils
+                        .getConnectorDefinition((NarClassLoader) componentClassLoader).getSinkConfigClass();
+            } else {
+                return config;
+            }
+            if (configClassName != null) {
+
+                Class<?> configClass;
+                try {
+                    configClass = Class.forName(configClassName,
+                            true, Thread.currentThread().getContextClassLoader());
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException("Config class not found: " + configClassName, e);
+                }
+                final List<String> allFields = BeanPropertiesReader.getBeanProperties(configClass);
+
+                for (String s : config.keySet()) {
+                    if (!allFields.contains(s)) {
+                        log.error("Field '{}' not defined in the {} configuration {}, the field will be ignored",
+                                s,
+                                componentType,
+                                configClass);
+                        config.remove(s);
+                    }
+                }
+            }
+        }
+        return config;
+    }
+
+    static final class BeanPropertiesReader {
+
+        private static final MapperBeanReader reader = new MapperBeanReader();
+
+        private static final class MapperBeanReader extends ObjectMapper {
+            @SneakyThrows
+            List<String> getBeanProperties(Class<?> valueType) {
+                final JsonParser parser = ObjectMapperFactory
+                        .getThreadLocal()
+                        .createParser("");
+                DeserializationConfig config = getDeserializationConfig();
+                DeserializationContext ctxt = createDeserializationContext(parser, config);
+                BeanDeserializer deser = (BeanDeserializer)
+                        _findRootDeserializer(ctxt, _typeFactory.constructType(valueType));
+                List<String> list = new ArrayList<>();
+                deser.properties().forEachRemaining(p -> list.add(p.getName()));
+                return list;
+            }
+        }
+
+        static List<String> getBeanProperties(Class<?> valueType) {
+            return reader.getBeanProperties(valueType);
+        }
+    }
+
 
     private void setupOutput(ContextImpl contextImpl) throws Exception {
 
@@ -922,8 +1003,8 @@ public class JavaInstanceRunnable implements AutoCloseable, Runnable {
                     log.debug("Opening Sink with SinkSpec {} and contextImpl: {} ", sinkSpec.toString(),
                             contextImpl.toString());
                 }
-                this.sink.open(ObjectMapperFactory.getThreadLocal().readValue(sinkSpec.getConfigs(),
-                        new TypeReference<Map<String, Object>>() {}), contextImpl);
+                final Map<String, Object> config = parseComponentConfig(sinkSpec.getConfigs());
+                this.sink.open(config, contextImpl);
             }
         } catch (Exception e) {
             log.error("Sink open produced uncaught exception: ", e);
