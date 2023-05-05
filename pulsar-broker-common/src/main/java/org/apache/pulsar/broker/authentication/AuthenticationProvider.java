@@ -30,6 +30,7 @@ import javax.net.ssl.SSLSession;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.pulsar.broker.ServiceConfiguration;
+import org.apache.pulsar.broker.authentication.metrics.AuthenticationMetrics;
 import org.apache.pulsar.common.api.AuthData;
 import org.apache.pulsar.common.util.FutureUtil;
 
@@ -172,4 +173,9 @@ public interface AuthenticationProvider extends Closeable {
             }
         }
     }
+
+    default void incrementFailureMetric(Enum<?> errorCode) {
+        AuthenticationMetrics.authenticateFailure(getClass().getSimpleName(), getAuthMethodName(), errorCode);
+    }
+
 }
