@@ -29,6 +29,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.DefaultJwtBuilder;
 import io.jsonwebtoken.io.Decoders;
@@ -59,6 +60,7 @@ import org.apache.pulsar.broker.authentication.utils.AuthTokenUtils;
 import org.apache.pulsar.common.api.AuthData;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 /**
@@ -76,6 +78,7 @@ public class AuthenticationProviderOpenIDIntegrationTest {
     // The valid issuer
     String issuer;
     String issuerWithTrailingSlash;
+    String issuerWithMissingKid;
     // This issuer is configured to return an issuer in the openid-configuration
     // that does not match the issuer on the token
     String issuerThatFails;
@@ -91,6 +94,7 @@ public class AuthenticationProviderOpenIDIntegrationTest {
         server.start();
         issuer = server.baseUrl();
         issuerWithTrailingSlash = issuer + "/trailing-slash/";
+        issuerWithMissingKid = issuer + "/missing-kid";
         issuerThatFails = issuer + "/fail";
         issuerK8s = issuer + "/k8s";
 
@@ -151,6 +155,34 @@ public class AuthenticationProviderOpenIDIntegrationTest {
                                         + "\"n\":\"%s\",\"e\":\"%s\"},{\"kid\":\"%s\",\"kty\":\"RSA\",\"n\":"
                                         + "\"invalid-key\",\"e\":\"AQAB\"}]}", validJwk, n, e, invalidJwk))));
 
+        server.stubFor(
+                get(urlEqualTo("/missing-kid/.well-known/openid-configuration"))
+                        .willReturn(aResponse()
+                                .withHeader("Content-Type", "application/json")
+                                .withBody(String.format("{\"issuer\": \"%s\",\"jwks_uri\": \"%s/keys\"}",
+                                        issuerWithMissingKid, issuerWithMissingKid))));
+
+        // Set up JWKS endpoint where it first responds without the KID, then with the KID. This is a stateful stub.
+        // Note that the state machine is circular to make it easier to verify the two code paths that rely on
+        // this logic.
+        server.stubFor(
+                get(urlMatching( "/missing-kid/keys"))
+                        .inScenario("Changing KIDs")
+                        .whenScenarioStateIs(Scenario.STARTED)
+                        .willSetStateTo("serve-kid")
+                        .willReturn(aResponse()
+                                .withHeader("Content-Type", "application/json")
+                                .withBody("{\"keys\":[]}")));
+        server.stubFor(
+                get(urlMatching( "/missing-kid/keys"))
+                        .inScenario("Changing KIDs")
+                        .whenScenarioStateIs("serve-kid")
+                        .willSetStateTo(Scenario.STARTED)
+                        .willReturn(aResponse()
+                                .withHeader("Content-Type", "application/json")
+                                .withBody(String.format("{\"keys\":[{\"kid\":\"%s\",\"kty\":\"RSA\",\"alg\":\"RS256\","
+                                        + "\"n\":\"%s\",\"e\":\"%s\"}]}", validJwk, n, e))));
+
         ServiceConfiguration conf = new ServiceConfiguration();
         conf.setAuthenticationEnabled(true);
         conf.setAuthenticationProviders(Collections.singleton(AuthenticationProviderOpenID.class.getName()));
@@ -174,6 +206,12 @@ public class AuthenticationProviderOpenIDIntegrationTest {
     @AfterClass
     void afterClass() {
         server.stop();
+    }
+
+    @BeforeMethod
+    public void beforeMethod() {
+        // Scenarios are stateful. Start each test with the correct state.
+        server.resetScenarios();
     }
 
     @Test
@@ -235,6 +273,52 @@ public class AuthenticationProviderOpenIDIntegrationTest {
             fail("Expected exception");
         } catch (ExecutionException e) {
             assertTrue(e.getCause() instanceof AuthenticationException, "Found exception: " + e.getCause());
+        }
+    }
+    @Test
+    public void testKidCacheMissWhenRefreshConfigZero() throws Exception {
+        ServiceConfiguration conf = new ServiceConfiguration();
+        conf.setAuthenticationEnabled(true);
+        conf.setAuthenticationProviders(Collections.singleton(AuthenticationProviderOpenID.class.getName()));
+        Properties props = conf.getProperties();
+        props.setProperty(AuthenticationProviderOpenID.REQUIRE_HTTPS, "false");
+        // Allows us to retrieve the JWK immediately after the cache miss of the KID
+        props.setProperty(AuthenticationProviderOpenID.KEY_ID_CACHE_MISS_REFRESH_SECONDS, "0");
+        props.setProperty(AuthenticationProviderOpenID.ALLOWED_AUDIENCES, "allowed-audience");
+        props.setProperty(AuthenticationProviderOpenID.ALLOWED_TOKEN_ISSUERS, issuerWithMissingKid);
+
+        AuthenticationProviderOpenID provider = new AuthenticationProviderOpenID();
+        provider.initialize(conf);
+
+        String role = "superuser";
+        String token = generateToken(validJwk, issuerWithMissingKid, role, "allowed-audience", 0L, 0L, 10000L);
+        assertEquals(role, provider.authenticateAsync(new AuthenticationDataCommand(token)).get());
+    }
+
+    @Test
+    public void testKidCacheMissWhenRefreshConfigLongerThanDelta() throws Exception {
+        ServiceConfiguration conf = new ServiceConfiguration();
+        conf.setAuthenticationEnabled(true);
+        conf.setAuthenticationProviders(Collections.singleton(AuthenticationProviderOpenID.class.getName()));
+        Properties props = conf.getProperties();
+        props.setProperty(AuthenticationProviderOpenID.REQUIRE_HTTPS, "false");
+        // This value is high enough that the provider will not refresh the JWK
+        props.setProperty(AuthenticationProviderOpenID.KEY_ID_CACHE_MISS_REFRESH_SECONDS, "100");
+        props.setProperty(AuthenticationProviderOpenID.ALLOWED_AUDIENCES, "allowed-audience");
+        props.setProperty(AuthenticationProviderOpenID.ALLOWED_TOKEN_ISSUERS, issuerWithMissingKid);
+
+        AuthenticationProviderOpenID provider = new AuthenticationProviderOpenID();
+        provider.initialize(conf);
+
+        String role = "superuser";
+        String token = generateToken(validJwk, issuerWithMissingKid, role, "allowed-audience", 0L, 0L, 10000L);
+        try {
+            provider.authenticateAsync(new AuthenticationDataCommand(token)).get();
+            fail("Expected exception");
+        } catch (ExecutionException e) {
+            assertTrue(e.getCause() instanceof IllegalArgumentException, "Found exception: " + e.getCause());
+            assertTrue(e.getCause().getMessage().contains("No JWK found for Key ID valid"),
+                    "Found exception: " + e.getCause());
         }
     }
 
