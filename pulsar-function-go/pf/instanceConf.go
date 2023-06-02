@@ -41,6 +41,11 @@ type instanceConf struct {
 	killAfterIdle               time.Duration
 	expectedHealthCheckInterval int32
 	metricsPort                 int
+	authPlugin                  string
+	authParams                  string
+	tlsTrustCertsPath           string
+	tlsAllowInsecure            bool
+	tlsHostnameVerification     bool
 }
 
 func newInstanceConf() *instanceConf {
@@ -102,6 +107,11 @@ func newInstanceConf() *instanceConf {
 			},
 			UserConfig: cfg.UserConfig,
 		},
+		authPlugin:              cfg.ClientAuthenticationPlugin,
+		authParams:              cfg.ClientAuthenticationParameters,
+		tlsTrustCertsPath:       cfg.TLSTrustCertsFilePath,
+		tlsAllowInsecure:        cfg.TLSAllowInsecureConnection,
+		tlsHostnameVerification: cfg.TLSHostnameVerificationEnable,
 	}
 	return instanceConf
 }

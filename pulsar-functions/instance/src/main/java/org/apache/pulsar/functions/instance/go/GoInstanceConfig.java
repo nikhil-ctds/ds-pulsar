@@ -43,6 +43,13 @@ public class GoInstanceConfig {
     private int processingGuarantees;
     private String secretsMap = "";
     private String userConfig = "";
+
+    private String clientAuthenticationPlugin = "";
+    private String clientAuthenticationParameters = "";
+    private String tlsTrustCertsFilePath = "";
+    private boolean tlsHostnameVerificationEnable = false;
+    private boolean tlsAllowInsecureConnection = false;
+
     private int runtime;
     private boolean autoAck;
     private int parallelism;

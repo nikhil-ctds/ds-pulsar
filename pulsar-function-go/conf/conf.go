@@ -27,7 +27,6 @@ import (
 	"time"
 
 	log "github.com/apache/pulsar/pulsar-function-go/logutil"
-	"gopkg.in/yaml.v2"
 )
 
 const ConfigPath = "conf/conf.yaml"
@@ -51,6 +50,12 @@ type Conf struct {
 	Runtime              int32  `json:"runtime" yaml:"runtime"`
 	AutoACK              bool   `json:"autoAck" yaml:"autoAck"`
 	Parallelism          int32  `json:"parallelism" yaml:"parallelism"`
+	// Authentication
+	ClientAuthenticationPlugin     string `json:"clientAuthenticationPlugin" yaml:"clientAuthenticationPlugin"`
+	ClientAuthenticationParameters string `json:"clientAuthenticationParameters" yaml:"clientAuthenticationParameters"`
+	TLSTrustCertsFilePath          string `json:"tlsTrustCertsFilePath" yaml:"tlsTrustCertsFilePath"`
+	TLSAllowInsecureConnection     bool   `json:"tlsAllowInsecureConnection" yaml:"tlsAllowInsecureConnection"`
+	TLSHostnameVerificationEnable  bool   `json:"tlsHostnameVerificationEnable" yaml:"tlsHostnameVerificationEnable"`
 	//source config
 	SubscriptionType     int32  `json:"subscriptionType" yaml:"subscriptionType"`
 	TimeoutMs            uint64 `json:"timeoutMs" yaml:"timeoutMs"`
