@@ -27,6 +27,7 @@ import (
 	"time"
 
 	log "github.com/apache/pulsar/pulsar-function-go/logutil"
+	"gopkg.in/yaml.v2"
 )
 
 const ConfigPath = "conf/conf.yaml"
