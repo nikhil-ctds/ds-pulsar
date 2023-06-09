@@ -1574,7 +1574,8 @@ public class PersistentTopicsBase extends AdminResource {
             future = CompletableFuture.completedFuture(null);
         }
 
-        future.thenCompose(__ -> validateTopicOwnershipAsync(topicName, authoritative)).thenAccept(__ -> {
+        future.thenCompose(__ -> validateTopicOperationAsync(topicName, TopicOperation.UNSUBSCRIBE, subName))
+                .thenCompose(__ -> validateTopicOwnershipAsync(topicName, authoritative)).thenAccept(__ -> {
             if (topicName.isPartitioned()) {
                 internalDeleteSubscriptionForNonPartitionedTopic(asyncResponse, subName, authoritative);
             } else {
@@ -1639,10 +1640,10 @@ public class PersistentTopicsBase extends AdminResource {
         });
     }
 
+    // Note: this method expects the caller to check authorization
     private void internalDeleteSubscriptionForNonPartitionedTopic(AsyncResponse asyncResponse,
                                                                   String subName, boolean authoritative) {
         validateTopicOwnershipAsync(topicName, authoritative)
-            .thenRun(() -> validateTopicOperation(topicName, TopicOperation.UNSUBSCRIBE))
             .thenCompose(__ -> {
                 Topic topic = getTopicReference(topicName);
                 Subscription sub = topic.getSubscription(subName);
