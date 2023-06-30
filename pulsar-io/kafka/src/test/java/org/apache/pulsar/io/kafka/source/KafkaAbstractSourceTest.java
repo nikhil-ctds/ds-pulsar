@@ -21,7 +21,10 @@ package org.apache.pulsar.io.kafka.source;
 
 
 import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.Collections;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
@@ -29,6 +32,8 @@ import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.io.core.SourceContext;
 import org.apache.pulsar.io.kafka.KafkaAbstractSource;
 import org.apache.pulsar.io.kafka.KafkaSourceConfig;
+import org.awaitility.Awaitility;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -152,6 +157,28 @@ public class KafkaAbstractSourceTest {
         assertEquals(config.getSslEndpointIdentificationAlgorithm(), "");
         assertEquals(config.getSslTruststoreLocation(), "/etc/cert.pem");
         assertEquals(config.getSslTruststorePassword(), "cert_pwd");
+    }
+
+    @Test
+    public final void closeConnectorWhenUnexpectedExceptionThrownTest() throws Exception {
+        KafkaAbstractSource source = new DummySource();
+        Consumer consumer = mock(Consumer.class);
+        Mockito.doThrow(new RuntimeException("Uncaught exception")).when(consumer)
+                .subscribe(Mockito.any(Collection.class));
+
+        Field consumerField = KafkaAbstractSource.class.getDeclaredField("consumer");
+        consumerField.setAccessible(true);
+        consumerField.set(source, consumer);
+
+        source.start();
+
+        Field runningField = KafkaAbstractSource.class.getDeclaredField("running");
+        runningField.setAccessible(true);
+
+        Awaitility.await().untilAsserted(() -> {
+            Assert.assertFalse((boolean) runningField.get(source));
+            Assert.assertNull(consumerField.get(source));
+        });
     }
 
     private File getFile(String name) {
