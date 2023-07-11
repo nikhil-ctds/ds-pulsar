@@ -101,9 +101,9 @@ public class NonPersistentStickyKeyDispatcherMultipleConsumersTest {
                             anyString(),
                             any(DispatchRateLimiter.Type.class)))
                     .thenReturn(false);
+            selector = new HashRangeAutoSplitStickyKeyConsumerSelector();
             nonpersistentDispatcher = new NonPersistentStickyKeyDispatcherMultipleConsumers(
-                    topicMock, subscriptionMock,
-                    new HashRangeAutoSplitStickyKeyConsumerSelector());
+                    topicMock, subscriptionMock, selector);
         }
     }
 
