@@ -19,14 +19,24 @@
 
 package org.apache.pulsar.functions.runtime.kubernetes;
 
+import static org.apache.pulsar.functions.runtime.RuntimeUtils.FUNCTIONS_INSTANCE_CLASSPATH;
+import static org.apache.pulsar.functions.utils.FunctionCommon.roundDecimal;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.spy;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.protobuf.util.JsonFormat;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
-import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
@@ -34,9 +44,18 @@ import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.kubernetes.client.openapi.models.V1Toleration;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 import org.apache.pulsar.functions.instance.AuthenticationConfig;
 import org.apache.pulsar.functions.instance.InstanceConfig;
@@ -59,25 +78,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import java.lang.reflect.Type;
-import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
-import static org.apache.pulsar.functions.runtime.RuntimeUtils.FUNCTIONS_INSTANCE_CLASSPATH;
-import static org.apache.pulsar.functions.utils.FunctionCommon.roundDecimal;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.spy;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
 
 /**
  * Unit test of {@link ThreadRuntime}.
@@ -1299,5 +1299,19 @@ public class KubernetesRuntimeTest {
             assertTrue(container.getProcessArgs().stream().collect(Collectors.joining(" "))
                     .contains("--metrics_port 0"));
         }
+    }
+
+    @Test
+    public void testSanitizingJarFileName() throws Exception {
+        String originalCodeFileName = "code(1).jar";
+        String originalTransformFunctionFileName = "transform(1).jar";
+        KubernetesRuntime kubernetesRuntime =
+                createKubernetesRuntimeFactory(null, 10, 1.0, 1.0, Optional.empty(), "/download", null, null)
+                        .createContainer(createJavaInstanceConfig(FunctionDetails.Runtime.JAVA, false),
+                                "/test/code", originalCodeFileName, "/test/transforms",
+                                originalTransformFunctionFileName,
+                                Long.MIN_VALUE);
+        List<String> processArgs = kubernetesRuntime.getProcessArgs();
+        assertThat(processArgs).contains("/download/code_1_.jar", "/download/transform_1_.jar");
     }
 }

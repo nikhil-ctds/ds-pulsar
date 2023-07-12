@@ -28,6 +28,7 @@ import java.io.BufferedReader;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
+import java.text.Normalizer;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -550,5 +551,16 @@ public class RuntimeUtils {
         new ThreadExports().register(registry);
         new ClassLoadingExports().register(registry);
         new VersionInfoExports().register(registry);
+    }
+
+    public static String sanitizeFileName(String fileName) {
+        if (fileName == null) {
+            return null;
+        }
+        // converts a unicode string to plain ascii
+        String asciiFileName = Normalizer.normalize(fileName, Normalizer.Form.NFD)
+                .replaceAll("[^\\p{ASCII}]", "");
+        // replaces all non-alphanumeric characters (excluding -_.) with _
+        return asciiFileName.replaceAll("[^a-zA-Z0-9-_.]", "_");
     }
 }
