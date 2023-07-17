@@ -50,6 +50,7 @@ import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.EntryBatchSizes;
 import org.apache.pulsar.broker.service.HashRangeAutoSplitStickyKeyConsumerSelector;
 import org.apache.pulsar.broker.service.RedeliveryTracker;
+import org.apache.pulsar.broker.service.StickyKeyConsumerSelector;
 import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
 import org.apache.pulsar.common.api.proto.MessageMetadata;
 import org.apache.pulsar.common.policies.data.HierarchyTopicPolicies;
@@ -67,6 +68,7 @@ public class NonPersistentStickyKeyDispatcherMultipleConsumersTest {
     private ServiceConfiguration configMock;
 
     private NonPersistentStickyKeyDispatcherMultipleConsumers nonpersistentDispatcher;
+    private StickyKeyConsumerSelector selector;
 
     final String topicName = "non-persistent://public/default/testTopic";
 
