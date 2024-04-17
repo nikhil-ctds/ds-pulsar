@@ -1545,10 +1545,17 @@ public class NamespaceService implements AutoCloseable {
     }
 
     public CompletableFuture<Boolean> checkOwnershipPresentAsync(NamespaceBundle bundle) {
+        return checkOwnershipPresentAsync(bundle, false);
+    }
+
+    public CompletableFuture<Boolean> checkOwnershipPresentAsync(NamespaceBundle bundle, boolean refresh) {
         if (ExtensibleLoadManagerImpl.isLoadManagerExtensionEnabled(pulsar)) {
             ExtensibleLoadManagerImpl extensibleLoadManager = ExtensibleLoadManagerImpl.get(loadManager.get());
             return extensibleLoadManager.getOwnershipAsync(Optional.empty(), bundle)
                     .thenApply(Optional::isPresent);
+        }
+        if (refresh) {
+            ownershipCache.invalidateLocalOwnerCache(bundle);
         }
         return getOwnerAsync(bundle).thenApply(Optional::isPresent);
     }
