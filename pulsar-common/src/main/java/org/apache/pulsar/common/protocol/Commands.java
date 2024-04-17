@@ -1937,15 +1937,6 @@ public class Commands {
             int readerIdx = metadataAndPayload.readerIndex();
             MessageMetadata metadata = Commands.parseMessageMetadata(metadataAndPayload);
             metadataAndPayload.readerIndex(readerIdx);
-            return peekStickyKey(metadata, topic, subscription);
-        } catch (Throwable t) {
-            log.error("[{}] [{}] Failed to peek sticky key from the message metadata", topic, subscription, t);
-            return Commands.NONE_KEY;
-        }
-    }
-
-    public static byte[] peekStickyKey(MessageMetadata metadata, String topic, String subscription) {
-        try {
             if (metadata.hasOrderingKey()) {
                 return metadata.getOrderingKey();
             } else if (metadata.hasPartitionKey()) {
@@ -1959,7 +1950,6 @@ public class Commands {
         }
         return Commands.NONE_KEY;
     }
-
 
     public static int getCurrentProtocolVersion() {
         return CURRENT_PROTOCOL_VERSION;
