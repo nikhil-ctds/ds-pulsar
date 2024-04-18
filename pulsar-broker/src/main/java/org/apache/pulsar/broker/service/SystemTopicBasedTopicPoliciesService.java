@@ -320,6 +320,10 @@ public class SystemTopicBasedTopicPoliciesService implements TopicPoliciesServic
             boolean readerCachedAndNotFailed = readerCompletableFuture != null
                     && readerCompletableFuture.isDone()
                     && !readerCompletableFuture.isCompletedExceptionally();
+            boolean completedExceptionally = readerCompletableFuture != null
+                    && readerCompletableFuture.isCompletedExceptionally();
+            log.info("[{}] addOwnedNamespaceBundleAsync, readerCachedAndNotFailed: {}, completedExceptionally: {}", namespace,
+                    readerCachedAndNotFailed, completedExceptionally);
             if (readerCachedAndNotFailed) {
                 ownedBundlesCountPerNamespace.get(namespace).incrementAndGet();
                 return CompletableFuture.completedFuture(null);

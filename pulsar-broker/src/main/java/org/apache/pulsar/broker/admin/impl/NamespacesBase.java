@@ -345,7 +345,7 @@ public abstract class NamespacesBase extends AdminResource {
                                 } else {
                                     callback.completeExceptionally(
                                             new RestException(Status.CONFLICT, "The broker still have in-flight topics"
-                                                    + " created during namespace deletion, please try again."));
+                                                    + " created during namespace deletion or some bundle is still owned, please try again."));
                                     // drop out recursive
                                 }
                                 return;
