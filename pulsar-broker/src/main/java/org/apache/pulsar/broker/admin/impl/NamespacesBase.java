@@ -159,7 +159,7 @@ public abstract class NamespacesBase extends AdminResource {
                     return CompletableFuture.completedFuture(null);
                 })
                 .thenCompose(__ -> namespaceResources().createPoliciesAsync(namespaceName, policies))
-                .thenAccept(__ -> log.info("[{}] Created namespace {}", clientAppId(), namespaceName));
+                .thenAccept(__ -> log.info("[{}] Created namespace {} with policies {}", clientAppId(), namespaceName, policies));
     }
 
     protected CompletableFuture<List<String>> internalGetListOfTopics(Policies policies,
@@ -269,13 +269,16 @@ public abstract class NamespacesBase extends AdminResource {
                                 }
                                 if (!force) {
                                     if (hasNonSystemTopic) {
-                                        throw new RestException(Status.CONFLICT, "Cannot delete non empty namespace");
+                                        log.info("Namespace {} has non-system topics, force delete is required. User topics: {}, user partitioned topics: {}",
+                                                namespaceName, allUserCreatedTopics, allUserCreatedPartitionTopics);
+                                        throw new RestException(Status.CONFLICT, "Cannot delete non empty namespace " + namespaceName);
                                     }
                                 }
                                 final CompletableFuture<Void> markDeleteFuture;
                                 if (policies != null && policies.deleted) {
                                     markDeleteFuture = CompletableFuture.completedFuture(null);
                                 } else {
+                                    log.info("Marking the namespace {} as deleted", namespaceName);
                                     markDeleteFuture = namespaceResources().setPoliciesAsync(namespaceName, old -> {
                                         old.deleted = true;
                                         return old;
