@@ -126,6 +126,14 @@ public class NonPersistentStickyKeyDispatcherMultipleConsumers extends NonPersis
                 }
             };
 
+    private static final FastThreadLocal<Map<Consumer, List<Integer>>> localGroupedStickyKeyHashes =
+            new FastThreadLocal<Map<Consumer, List<Integer>>>() {
+                @Override
+                protected Map<Consumer, List<Integer>> initialValue() throws Exception {
+                    return new HashMap<>();
+                }
+            };
+
     @Override
     public void sendMessages(List<Entry> entries) {
         if (entries.isEmpty()) {
@@ -139,7 +147,8 @@ public class NonPersistentStickyKeyDispatcherMultipleConsumers extends NonPersis
 
         final Map<Consumer, List<Entry>> groupedEntries = localGroupedEntries.get();
         groupedEntries.clear();
-        final Map<Consumer, List<Integer>> consumerStickyKeyHashesMap = new HashMap<>();
+        final Map<Consumer, List<Integer>> consumerStickyKeyHashesMap = localGroupedStickyKeyHashes.get();
+        consumerStickyKeyHashesMap.clear();
 
         for (Entry entry : entries) {
             byte[] stickyKey = peekStickyKey(entry.getDataBuffer());
