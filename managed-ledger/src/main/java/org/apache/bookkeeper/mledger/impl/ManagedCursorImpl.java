@@ -640,7 +640,8 @@ public class ManagedCursorImpl implements ManagedCursor {
     }
 
     private void recoverIndividualDeletedMessages(List<MLDataFormats.MessageRange> individualDeletedMessagesList) {
-        log.info("[{}] [{}] Recovering individual deleted messages. Number of ranges: {}", ledger.getName(), name, individualDeletedMessagesList.size());
+        log.info("[{}] [{}] Recovering individual deleted messages. Number of ranges: {}",
+                ledger.getName(), name, individualDeletedMessagesList.size());
         lock.writeLock().lock();
         try {
             individualDeletedMessages.clear();
@@ -3034,7 +3035,8 @@ public class ManagedCursorImpl implements ManagedCursor {
     private List<MLDataFormats.MessageRange> buildIndividualDeletedMessageRanges() {
         lock.readLock().lock();
         try {
-            log.info("[{}] [{}] buildIndividualDeletedMessageRanges, numRanges {}", ledger.getName(), name, individualDeletedMessages.size());
+            log.info("[{}] [{}] buildIndividualDeletedMessageRanges, numRanges {}",
+                    ledger.getName(), name, individualDeletedMessages.size());
             if (individualDeletedMessages.isEmpty()) {
                 this.individualDeletedMessagesSerializedSize = 0;
                 return Collections.emptyList();
@@ -3073,8 +3075,11 @@ public class ManagedCursorImpl implements ManagedCursor {
 
             this.individualDeletedMessagesSerializedSize = acksSerializedSize.get();
             individualDeletedMessages.resetDirtyKeys();
-            log.info("[{}] [{}] buildIndividualDeletedMessageRanges, numRanges {} individualDeletedMessagesSerializedSize {} rangeListSize {} maxUnackedRangesToPersist {}",
-                    ledger.getName(), name, individualDeletedMessages.size(), individualDeletedMessagesSerializedSize, rangeList.size(), config.getMaxUnackedRangesToPersist());
+            log.info("[{}] [{}] buildIndividualDeletedMessageRanges, numRanges {} "
+                            + "individualDeletedMessagesSerializedSize {} rangeListSize {} "
+                            + "maxUnackedRangesToPersist {}",
+                    ledger.getName(), name, individualDeletedMessages.size(),
+                    individualDeletedMessagesSerializedSize, rangeList.size(), config.getMaxUnackedRangesToPersist());
 
             return rangeList;
         } finally {
@@ -3133,7 +3138,8 @@ public class ManagedCursorImpl implements ManagedCursor {
 
         byte[] data = compressDataIfNeeded(rawData, lh);
 
-        log.info("[{}] Cursor {} Appending to ledger={} position={} data size {} bytes", ledger.getName(), name, lh.getId(),
+        log.info("[{}] Cursor {} Appending to ledger={} position={} data size {} bytes",
+                ledger.getName(), name, lh.getId(),
                 position, data.length);
 
         lh.asyncAddEntry(data, (rc, lh1, entryId, ctx) -> {
@@ -3162,7 +3168,8 @@ public class ManagedCursorImpl implements ManagedCursor {
     }
 
     private byte[] compressDataIfNeeded(byte[] data, LedgerHandle lh) {
-        byte[] pulsarCursorInfoCompression = lh.getCustomMetadata().get(METADATA_PROPERTY_CURSOR_COMPRESSION_TYPE);
+        byte[] pulsarCursorInfoCompression =
+                lh.getCustomMetadata().get(METADATA_PROPERTY_CURSOR_COMPRESSION_TYPE);
         if (pulsarCursorInfoCompression != null) {
             String pulsarCursorInfoCompressionString = new String(pulsarCursorInfoCompression);
             CompressionCodec compressionCodec = CompressionCodecProvider.getCompressionCodec(
@@ -3191,7 +3198,8 @@ public class ManagedCursorImpl implements ManagedCursor {
     }
 
     private static byte[] decompressDataIfNeeded(byte[] data, LedgerHandle lh) {
-        byte[] pulsarCursorInfoCompression = lh.getCustomMetadata().get(METADATA_PROPERTY_CURSOR_COMPRESSION_TYPE);
+        byte[] pulsarCursorInfoCompression =
+                lh.getCustomMetadata().get(METADATA_PROPERTY_CURSOR_COMPRESSION_TYPE);
         if (pulsarCursorInfoCompression != null) {
             String pulsarCursorInfoCompressionString = new String(pulsarCursorInfoCompression);
             CompressionCodec compressionCodec = CompressionCodecProvider.getCompressionCodec(
