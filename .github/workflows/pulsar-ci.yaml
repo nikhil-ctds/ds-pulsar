@@ -23,6 +23,7 @@ on:
     branches:
       - master
       - 3.1_ds
+      - 3.1_fx
   schedule:
     - cron: '0 12 * * *'
   workflow_dispatch:
