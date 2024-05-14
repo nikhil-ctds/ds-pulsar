@@ -20,6 +20,7 @@ package org.apache.bookkeeper.mledger.impl;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
@@ -456,9 +457,12 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
                 // unfortunately have to copy buffer to unpooled instead of passing `decode` directly.
                 // parseFrom() keeps reference to ByteBuf internally
                 // and does not provide a way to release it.
-                ByteBuf uncompressed = Unpooled.copiedBuffer(decode);
-                decode.release();
-                info.parseFrom(uncompressed, uncompressed.readableBytes());
+                try {
+                    byte[] uncompressed = ByteBufUtil.getBytes(decode);
+                    info.parseFrom(uncompressed);
+                } finally {
+                    decode.release();
+                }
                 return info;
             } catch (Exception e) {
                 log.error("Failed to parse managedLedgerInfo metadata, "
@@ -492,9 +496,12 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
                 // unfortunately have to copy buffer to unpooled instead of passing `decode` directly.
                 // parseFrom() keeps reference to ByteBuf internally
                 // and does not provide a way to release it.
-                ByteBuf uncompressed = Unpooled.copiedBuffer(decode);
-                decode.release();
-                info.parseFrom(uncompressed, uncompressed.readableBytes());
+                try {
+                    byte[] uncompressed = ByteBufUtil.getBytes(decode);
+                    info.parseFrom(uncompressed);
+                } finally {
+                    decode.release();
+                }
                 return info;
             } catch (Exception e) {
                 log.error("Failed to parse ManagedCursorInfo metadata, "
