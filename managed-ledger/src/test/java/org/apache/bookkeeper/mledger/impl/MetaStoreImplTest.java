@@ -167,7 +167,7 @@ public class MetaStoreImplTest extends MockedBookKeeperTestCase {
 
         final CompletableFuture<Void> promise = new CompletableFuture<>();
 
-        ManagedCursorInfo info = ManagedCursorInfo.newBuilder().setCursorsLedgerId(1).build();
+        ManagedCursorInfo info = new ManagedCursorInfo().setCursorsLedgerId(1);
         store.asyncUpdateCursorInfo("my_test", "c1", info, null, new MetaStoreCallback<Void>() {
             public void operationFailed(MetaStoreException e) {
                 promise.completeExceptionally(e);
@@ -180,7 +180,7 @@ public class MetaStoreImplTest extends MockedBookKeeperTestCase {
                                 && path.contains("my_test") && path.contains("c1")
                 );
 
-                ManagedCursorInfo info = ManagedCursorInfo.newBuilder().setCursorsLedgerId(2).build();
+                ManagedCursorInfo info = new ManagedCursorInfo().setCursorsLedgerId(2);
                 store.asyncUpdateCursorInfo("my_test", "c1", info, version, new MetaStoreCallback<Void>() {
                     public void operationFailed(MetaStoreException e) {
                         // ok

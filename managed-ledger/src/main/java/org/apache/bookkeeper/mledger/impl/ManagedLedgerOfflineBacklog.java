@@ -20,7 +20,6 @@ package org.apache.bookkeeper.mledger.impl;
 
 import com.google.common.collect.BoundType;
 import com.google.common.collect.Range;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.NavigableMap;
@@ -147,7 +146,7 @@ public class ManagedLedgerOfflineBacklog {
                 new MetaStore.MetaStoreCallback<MLDataFormats.ManagedLedgerInfo>() {
                     @Override
                     public void operationComplete(MLDataFormats.ManagedLedgerInfo mlInfo, Stat stat) {
-                        for (MLDataFormats.ManagedLedgerInfo.LedgerInfo ls : mlInfo.getLedgerInfoList()) {
+                        for (MLDataFormats.ManagedLedgerInfo.LedgerInfo ls : mlInfo.getLedgerInfosList()) {
                             ledgers.put(ls.getLedgerId(), ls);
                         }
 
@@ -161,9 +160,11 @@ public class ManagedLedgerOfflineBacklog {
                                 }
                                 if (rc == BKException.Code.OK) {
                                     MLDataFormats.ManagedLedgerInfo.LedgerInfo info =
-                                        MLDataFormats.ManagedLedgerInfo.LedgerInfo
-                                            .newBuilder().setLedgerId(id).setEntries(lh.getLastAddConfirmed() + 1)
-                                            .setSize(lh.getLength()).setTimestamp(System.currentTimeMillis()).build();
+                                            new MLDataFormats.ManagedLedgerInfo.LedgerInfo()
+                                                    .setLedgerId(id)
+                                                    .setEntries(lh.getLastAddConfirmed() + 1)
+                                                    .setSize(lh.getLength())
+                                                    .setTimestamp(System.currentTimeMillis());
                                     ledgers.put(id, info);
                                     mlMetaCounter.countDown();
                                 } else if (Errors.isNoSuchLedgerExistsException(rc)) {
@@ -299,8 +300,9 @@ public class ManagedLedgerOfflineBacklog {
                                         LedgerEntry entry = seq.nextElement();
                                         MLDataFormats.PositionInfo positionInfo;
                                         try {
-                                            positionInfo = MLDataFormats.PositionInfo.parseFrom(entry.getEntry());
-                                        } catch (InvalidProtocolBufferException e) {
+                                            positionInfo = new MLDataFormats.PositionInfo();
+                                            positionInfo.parseFrom(entry.getEntry());
+                                        } catch (Throwable e) {
                                             log.warn(
                                                 "[{}] Error reading position from metadata ledger {} for cursor {}: {}",
                                                 managedLedgerName, ledgerId, cursorName, e);
@@ -436,7 +438,8 @@ public class ManagedLedgerOfflineBacklog {
                 if (log.isDebugEnabled()) {
                     log.debug(" Read entry {} from ledger {} for cursor {}", lastEntry, ledgerId, cursorName);
                 }
-                MLDataFormats.PositionInfo positionInfo = MLDataFormats.PositionInfo.parseFrom(ledgerEntry.getEntry());
+                MLDataFormats.PositionInfo positionInfo = new MLDataFormats.PositionInfo();
+                positionInfo.parseFrom(ledgerEntry.getEntry());
                 lastAckedMessagePosition = new PositionImpl(positionInfo);
                 if (log.isDebugEnabled()) {
                     log.debug("Cursor {} read position {}", cursorName, lastAckedMessagePosition);

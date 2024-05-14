@@ -73,7 +73,11 @@ public class PositionTest {
     @Test
     public void hashes() throws Exception {
         PositionImpl p1 = new PositionImpl(5, 15);
-        PositionImpl p2 = new PositionImpl(PositionInfo.parseFrom(p1.getPositionInfo().toByteArray()));
+
+        PositionInfo pi = new PositionInfo();
+        pi.parseFrom(p1.getPositionInfo().toByteArray());
+
+        PositionImpl p2 = new PositionImpl(pi);
         assertEquals(p2.getLedgerId(), 5);
         assertEquals(p2.getEntryId(), 15);
         assertEquals(new PositionImpl(5, 15).hashCode(), p2.hashCode());

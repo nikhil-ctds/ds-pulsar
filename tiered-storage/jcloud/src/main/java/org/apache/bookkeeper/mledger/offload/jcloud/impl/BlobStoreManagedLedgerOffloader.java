@@ -434,16 +434,16 @@ public class BlobStoreManagedLedgerOffloader implements LedgerOffloader {
             streamingIndexBuilder.withDataBlockHeaderLength(StreamingDataBlockHeaderImpl.getDataStartOffset());
             streamingIndexBuilder.addBlock(blockLedgerId, beginEntryId, partId, blockSize);
             final MLDataFormats.ManagedLedgerInfo.LedgerInfo ledgerInfo = ml.getLedgerInfo(blockLedgerId).get();
-            final MLDataFormats.ManagedLedgerInfo.LedgerInfo.Builder ledgerInfoBuilder =
-                    MLDataFormats.ManagedLedgerInfo.LedgerInfo.newBuilder();
+            final MLDataFormats.ManagedLedgerInfo.LedgerInfo ledgerInfoBuilder =
+                    new MLDataFormats.ManagedLedgerInfo.LedgerInfo();
             if (ledgerInfo != null) {
-                ledgerInfoBuilder.mergeFrom(ledgerInfo);
+                ledgerInfoBuilder.copyFrom(ledgerInfo);
             }
             if (ledgerInfoBuilder.getEntries() == 0) {
                 //ledger unclosed, use last entry id of the block
                 ledgerInfoBuilder.setEntries(payloadStream.getEndEntryId() + 1);
             }
-            streamingIndexBuilder.addLedgerMeta(blockLedgerId, ledgerInfoBuilder.build());
+            streamingIndexBuilder.addLedgerMeta(blockLedgerId, ledgerInfoBuilder);
             log.debug("UploadMultipartPart. container: {}, blobName: {}, partId: {}, mpu: {}",
                     config.getBucket(), streamingDataBlockKey, partId, streamingMpu.id());
         } catch (Throwable e) {
@@ -569,7 +569,7 @@ public class BlobStoreManagedLedgerOffloader implements LedgerOffloader {
         BlobStoreLocation bsKey = getBlobStoreLocation(offloadDriverMetadata);
         String readBucket = bsKey.getBucket();
         CompletableFuture<ReadHandle> promise = new CompletableFuture<>();
-        final List<MLDataFormats.OffloadSegment> offloadSegmentList = ledgerContext.getOffloadSegmentList();
+        final List<MLDataFormats.OffloadSegment> offloadSegmentList = ledgerContext.getOffloadSegmentsList();
         List<String> keys = Lists.newLinkedList();
         List<String> indexKeys = Lists.newLinkedList();
         offloadSegmentList.forEach(seg -> {

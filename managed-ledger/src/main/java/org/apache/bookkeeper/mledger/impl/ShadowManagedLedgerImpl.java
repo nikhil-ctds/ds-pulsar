@@ -86,7 +86,7 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                     return;
                 }
                 sourceLedgersStat = stat;
-                if (mlInfo.getLedgerInfoCount() == 0) {
+                if (mlInfo.getLedgerInfosCount() == 0) {
                     // Small chance here, since shadow topic is created after source topic exists.
                     log.warn("[{}] Source topic ledger list is empty! source={},mlInfo={},stat={}", name, sourceMLName,
                             mlInfo, stat);
@@ -100,7 +100,7 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                             lastConfirmedEntry);
                 }
 
-                for (LedgerInfo ls : mlInfo.getLedgerInfoList()) {
+                for (LedgerInfo ls : mlInfo.getLedgerInfosList()) {
                     ledgers.put(ls.getLedgerId(), ls);
                 }
 
@@ -113,11 +113,11 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                     }
                     if (rc == BKException.Code.OK) {
                         LedgerInfo info =
-                                LedgerInfo.newBuilder()
+                                new LedgerInfo()
                                         .setLedgerId(lastLedgerId)
                                         .setEntries(lh.getLastAddConfirmed() + 1)
                                         .setSize(lh.getLength())
-                                        .setTimestamp(clock.millis()).build();
+                                        .setTimestamp(clock.millis());
                         ledgers.put(lastLedgerId, info);
 
                         //Always consider the last ledger is opened in source.
@@ -283,7 +283,7 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
         }
 
         TreeMap<Long, LedgerInfo> newLedgerInfos = new TreeMap<>();
-        for (LedgerInfo ls : mlInfo.getLedgerInfoList()) {
+        for (LedgerInfo ls : mlInfo.getLedgerInfosList()) {
             newLedgerInfos.put(ls.getLedgerId(), ls);
         }
 
@@ -299,9 +299,9 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                         log.info("[{}] Old ledger info updated in source,ledgerId={}", name, ledgerId);
                         // ledger deleted from bookkeeper by offloader.
                         if (ledgerInfo.hasOffloadContext()
-                                && ledgerInfo.getOffloadContext().getBookkeeperDeleted()
+                                && ledgerInfo.getOffloadContext().isBookkeeperDeleted()
                                 && (!oldLedgerInfo.hasOffloadContext() || !oldLedgerInfo.getOffloadContext()
-                                .getBookkeeperDeleted())) {
+                                .isBookkeeperDeleted())) {
                             log.info("[{}] Old ledger removed from bookkeeper by offloader in source,ledgerId={}", name,
                                     ledgerId);
                             invalidateReadHandle(ledgerId);
@@ -323,11 +323,11 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                             log.debug("[{}] Opened new source ledger {}", name, lastLedgerId);
                         }
                         if (rc == BKException.Code.OK) {
-                            LedgerInfo info = LedgerInfo.newBuilder()
+                            LedgerInfo info = new LedgerInfo()
                                     .setLedgerId(lastLedgerId)
                                     .setEntries(lh.getLastAddConfirmed() + 1)
                                     .setSize(lh.getLength())
-                                    .setTimestamp(clock.millis()).build();
+                                    .setTimestamp(clock.millis());
                             ledgers.put(lastLedgerId, info);
                             currentLedger = lh;
                             currentLedgerEntries = 0;

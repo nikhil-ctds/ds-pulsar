@@ -35,7 +35,6 @@ import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.LedgerInfo;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.MessageRange;
-import org.apache.bookkeeper.mledger.proto.MLDataFormats.NestedPositionInfo;
 import org.apache.pulsar.common.util.collections.LongPairRangeSet;
 import org.testng.annotations.Test;
 
@@ -99,24 +98,23 @@ public class ManagedCursorIndividualDeletedMessagesTest {
     }
 
     private static LedgerInfo createLedgerInfo(long ledgerId, long entries, long size) {
-        return LedgerInfo.newBuilder().setLedgerId(ledgerId).setEntries(entries).setSize(size)
-                .setTimestamp(System.currentTimeMillis()).build();
+        return new LedgerInfo().setLedgerId(ledgerId).setEntries(entries).setSize(size)
+                .setTimestamp(System.currentTimeMillis());
     }
 
     private static MessageRange createMessageRange(long lowerLedgerId, long lowerEntryId, long upperLedgerId,
             long upperEntryId) {
-        NestedPositionInfo.Builder nestedPositionBuilder = NestedPositionInfo.newBuilder();
-        MessageRange.Builder messageRangeBuilder = MessageRange.newBuilder();
+        MessageRange messageRangeBuilder = new MessageRange();
 
-        nestedPositionBuilder.setLedgerId(lowerLedgerId);
-        nestedPositionBuilder.setEntryId(lowerEntryId);
-        messageRangeBuilder.setLowerEndpoint(nestedPositionBuilder.build());
+        messageRangeBuilder.setLowerEndpoint()
+                .setLedgerId(lowerLedgerId)
+                .setEntryId(lowerEntryId);
 
-        nestedPositionBuilder.setLedgerId(upperLedgerId);
-        nestedPositionBuilder.setEntryId(upperEntryId);
-        messageRangeBuilder.setUpperEndpoint(nestedPositionBuilder.build());
+        messageRangeBuilder.setUpperEndpoint()
+                .setLedgerId(upperLedgerId)
+                .setEntryId(upperEntryId);
 
-        return messageRangeBuilder.build();
+        return messageRangeBuilder;
     }
 
     private static Range<PositionImpl> createPositionRange(long lowerLedgerId, long lowerEntryId, long upperLedgerId,

@@ -21,7 +21,6 @@ package org.apache.bookkeeper.mledger.offload;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,8 +29,8 @@ public class OffloadUtilsTest {
 
     @Test
     void testOffloadMetadataShouldClearBeforeSet() {
-        MLDataFormats.ManagedLedgerInfo.LedgerInfo.Builder builder =
-                MLDataFormats.ManagedLedgerInfo.LedgerInfo.newBuilder();
+        MLDataFormats.ManagedLedgerInfo.LedgerInfo builder =
+                new MLDataFormats.ManagedLedgerInfo.LedgerInfo();
         builder.setLedgerId(1L);
 
         Map<String, String> map = new HashMap<>();
@@ -45,13 +44,13 @@ public class OffloadUtilsTest {
         OffloadUtils.setOffloadDriverMetadata(builder, "offload", map);
 
         MLDataFormats.OffloadDriverMetadata offloadDriverMetadata =
-                builder.build().getOffloadContext().getDriverMetadata();
+                builder.getOffloadContext().getDriverMetadata();
         Assert.assertEquals(offloadDriverMetadata.getPropertiesList().size(), 2);
 
-        Assert.assertEquals(offloadDriverMetadata.getProperties(0).getKey(), "key1");
-        Assert.assertEquals(offloadDriverMetadata.getProperties(1).getKey(), "key2");
-        Assert.assertEquals(offloadDriverMetadata.getProperties(0).getValue(), "value1");
-        Assert.assertEquals(offloadDriverMetadata.getProperties(1).getValue(), "value2");
+        Assert.assertEquals(offloadDriverMetadata.getPropertyAt(0).getKey(), "key1");
+        Assert.assertEquals(offloadDriverMetadata.getPropertyAt(1).getKey(), "key2");
+        Assert.assertEquals(offloadDriverMetadata.getPropertyAt(0).getValue(), "value1");
+        Assert.assertEquals(offloadDriverMetadata.getPropertyAt(1).getValue(), "value2");
     }
 
 }

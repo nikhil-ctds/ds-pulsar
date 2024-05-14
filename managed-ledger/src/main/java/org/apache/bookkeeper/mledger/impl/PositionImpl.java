@@ -163,6 +163,6 @@ public class PositionImpl implements Position, Comparable<PositionImpl> {
     }
 
     public PositionInfo getPositionInfo() {
-        return PositionInfo.newBuilder().setLedgerId(ledgerId).setEntryId(entryId).build();
+        return new PositionInfo().setLedgerId(ledgerId).setEntryId(entryId);
     }
 }

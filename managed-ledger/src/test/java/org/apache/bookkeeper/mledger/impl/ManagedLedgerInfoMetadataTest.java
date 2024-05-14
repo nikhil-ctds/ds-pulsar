@@ -56,17 +56,17 @@ public class ManagedLedgerInfoMetadataTest {
         };
     }
 
-    private MLDataFormats.ManagedLedgerInfo.Builder generateManagedLedgerInfo(long ledgerId, int ledgerInfoNumber) {
+    private MLDataFormats.ManagedLedgerInfo generateManagedLedgerInfo(long ledgerId, int ledgerInfoNumber) {
         List<MLDataFormats.ManagedLedgerInfo.LedgerInfo> ledgerInfoList = new ArrayList<>();
         for (int i = 0; i < ledgerInfoNumber; i++) {
-            MLDataFormats.ManagedLedgerInfo.LedgerInfo.Builder builder = MLDataFormats.ManagedLedgerInfo.LedgerInfo.newBuilder();
+            MLDataFormats.ManagedLedgerInfo.LedgerInfo builder = new MLDataFormats.ManagedLedgerInfo.LedgerInfo();
             builder.setLedgerId(ledgerId);
             builder.setEntries(RandomUtils.nextInt());
             builder.setSize(RandomUtils.nextLong());
             builder.setTimestamp(System.currentTimeMillis());
 
             UUID uuid = UUID.randomUUID();
-            builder.getOffloadContextBuilder()
+            builder.setOffloadContext()
                     .setUidMsb(uuid.getMostSignificantBits())
                     .setUidLsb(uuid.getLeastSignificantBits());
             Map<String, String> offloadDriverMetadata = new HashMap<>();
@@ -80,19 +80,18 @@ public class ManagedLedgerInfoMetadataTest {
                     offloadDriverMetadata
             );
 
-            MLDataFormats.ManagedLedgerInfo.LedgerInfo ledgerInfo = builder.build();
+            MLDataFormats.ManagedLedgerInfo.LedgerInfo ledgerInfo = builder;
             ledgerInfoList.add(ledgerInfo);
             ledgerId ++;
         }
 
-        return MLDataFormats.ManagedLedgerInfo.newBuilder()
-                .addAllLedgerInfo(ledgerInfoList);
+        return new MLDataFormats.ManagedLedgerInfo().addAllLedgerInfos(ledgerInfoList);
     }
 
     @Test(dataProvider = "compressionTypeProvider")
     public void testEncodeAndDecode(String compressionType) throws IOException {
         long ledgerId = 10000;
-        MLDataFormats.ManagedLedgerInfo managedLedgerInfo = generateManagedLedgerInfo(ledgerId,100).build();
+        MLDataFormats.ManagedLedgerInfo managedLedgerInfo = generateManagedLedgerInfo(ledgerId,100);
 
         MetaStoreImpl metaStore;
         try {
@@ -138,14 +137,14 @@ public class ManagedLedgerInfoMetadataTest {
         int compressThreshold = 512;
 
         // should not compress
-        MLDataFormats.ManagedLedgerInfo smallInfo = generateManagedLedgerInfo(ledgerId, 0).build();
+        MLDataFormats.ManagedLedgerInfo smallInfo = generateManagedLedgerInfo(ledgerId, 0);
         assertTrue(smallInfo.getSerializedSize() < compressThreshold);
 
         // should compress
-        MLDataFormats.ManagedLedgerInfo bigInfo = generateManagedLedgerInfo(ledgerId, 1000).build();
+        MLDataFormats.ManagedLedgerInfo bigInfo = generateManagedLedgerInfo(ledgerId, 1000);
         assertTrue(bigInfo.getSerializedSize() > compressThreshold);
 
-        MLDataFormats.ManagedLedgerInfo managedLedgerInfo = generateManagedLedgerInfo(ledgerId,100).build();
+        MLDataFormats.ManagedLedgerInfo managedLedgerInfo = generateManagedLedgerInfo(ledgerId,100);
 
         MetaStoreImpl metaStore;
         try {

@@ -403,7 +403,8 @@ public class TestPulsarRecordCursor extends TestPulsarConnector {
                     }
                 });
 
-                when(readOnlyCursor.getCurrentLedgerInfo()).thenReturn(MLDataFormats.ManagedLedgerInfo.LedgerInfo.newBuilder().setLedgerId(0).build());
+                when(readOnlyCursor.getCurrentLedgerInfo()).thenReturn(new MLDataFormats.ManagedLedgerInfo.LedgerInfo()
+                        .setLedgerId(0));
 
                 return readOnlyCursor;
             }

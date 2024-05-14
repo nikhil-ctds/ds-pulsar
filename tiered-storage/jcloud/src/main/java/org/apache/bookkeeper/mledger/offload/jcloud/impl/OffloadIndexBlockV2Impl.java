@@ -217,7 +217,9 @@ public class OffloadIndexBlockV2Impl implements OffloadIndexBlockV2 {
     }
 
     private static LedgerInfo parseLedgerInfo(byte[] bytes) throws IOException {
-        return LedgerInfo.newBuilder().mergeFrom(bytes).build();
+        LedgerInfo info = new LedgerInfo();
+        info.parseFrom(bytes);
+        return info;
     }
 
     private OffloadIndexBlockV2 fromStream(DataInputStream dis) throws IOException {

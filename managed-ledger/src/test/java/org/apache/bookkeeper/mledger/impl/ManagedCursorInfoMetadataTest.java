@@ -51,21 +51,21 @@ public class ManagedCursorInfoMetadataTest {
         };
     }
 
-    private MLDataFormats.ManagedCursorInfo.Builder generateManagedCursorInfo(long ledgerId, int positionNumber) {
-        MLDataFormats.ManagedCursorInfo.Builder builder = MLDataFormats.ManagedCursorInfo.newBuilder();
+    private MLDataFormats.ManagedCursorInfo generateManagedCursorInfo(long ledgerId, int positionNumber) {
+        MLDataFormats.ManagedCursorInfo builder = new MLDataFormats.ManagedCursorInfo();
 
         builder.setCursorsLedgerId(ledgerId);
         builder.setMarkDeleteLedgerId(ledgerId);
 
         List<MLDataFormats.BatchedEntryDeletionIndexInfo> batchedEntryDeletionIndexInfos = new ArrayList<>();
         for (int i = 0; i < positionNumber; i++) {
-            MLDataFormats.NestedPositionInfo nestedPositionInfo = MLDataFormats.NestedPositionInfo.newBuilder()
-                    .setEntryId(i).setLedgerId(i).build();
-            MLDataFormats.BatchedEntryDeletionIndexInfo batchedEntryDeletionIndexInfo = MLDataFormats
-                    .BatchedEntryDeletionIndexInfo.newBuilder().setPosition(nestedPositionInfo).build();
+            MLDataFormats.BatchedEntryDeletionIndexInfo batchedEntryDeletionIndexInfo =
+                    new MLDataFormats.BatchedEntryDeletionIndexInfo();
+
+            batchedEntryDeletionIndexInfo.setPosition().setEntryId(i).setLedgerId(i);
             batchedEntryDeletionIndexInfos.add(batchedEntryDeletionIndexInfo);
         }
-        builder.addAllBatchedEntryDeletionIndexInfo(batchedEntryDeletionIndexInfos);
+        builder.addAllBatchedEntryDeletionIndexInfos(batchedEntryDeletionIndexInfos);
 
         return builder;
     }
@@ -73,7 +73,6 @@ public class ManagedCursorInfoMetadataTest {
     @Test(dataProvider = "compressionTypeProvider")
     public void testEncodeAndDecode(String compressionType) throws IOException {
         long ledgerId = 10000;
-        MLDataFormats.ManagedCursorInfo.Builder builder = generateManagedCursorInfo(ledgerId, 1000);
         MetaStoreImpl metaStore;
         if (INVALID_TYPE.equals(compressionType)) {
             IllegalArgumentException compressionTypeEx = expectThrows(IllegalArgumentException.class, () -> {
@@ -87,7 +86,7 @@ public class ManagedCursorInfoMetadataTest {
             metaStore = new MetaStoreImpl(null, null, null, new MetadataCompressionConfig(compressionType));
         }
 
-        MLDataFormats.ManagedCursorInfo managedCursorInfo = builder.build();
+        MLDataFormats.ManagedCursorInfo managedCursorInfo = generateManagedCursorInfo(ledgerId, 1000);
         byte[] compressionBytes = metaStore.compressCursorInfo(managedCursorInfo);
         log.info("[{}] Uncompressed data size: {}, compressed data size: {}",
                 compressionType, managedCursorInfo.getSerializedSize(), compressionBytes.length);
@@ -107,11 +106,11 @@ public class ManagedCursorInfoMetadataTest {
 
         long ledgerId = 10000;
         // should not compress
-        MLDataFormats.ManagedCursorInfo smallInfo = generateManagedCursorInfo(ledgerId, 1).build();
+        MLDataFormats.ManagedCursorInfo smallInfo = generateManagedCursorInfo(ledgerId, 1);
         assertTrue(smallInfo.getSerializedSize() < compressThreshold);
 
         // should compress
-        MLDataFormats.ManagedCursorInfo bigInfo = generateManagedCursorInfo(ledgerId, 1000).build();
+        MLDataFormats.ManagedCursorInfo bigInfo = generateManagedCursorInfo(ledgerId, 1000);
         assertTrue(bigInfo.getSerializedSize() > compressThreshold);
 
         MetaStoreImpl metaStore;

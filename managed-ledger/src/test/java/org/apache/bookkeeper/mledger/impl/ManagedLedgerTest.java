@@ -127,7 +127,6 @@ import org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.VoidCallback;
 import org.apache.bookkeeper.mledger.impl.MetaStore.MetaStoreCallback;
 import org.apache.bookkeeper.mledger.impl.cache.EntryCache;
 import org.apache.bookkeeper.mledger.impl.cache.EntryCacheManager;
-import org.apache.bookkeeper.mledger.proto.MLDataFormats;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.LedgerInfo;
 import org.apache.bookkeeper.mledger.util.Futures;
@@ -2026,12 +2025,12 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
             @Override
             public void operationComplete(ManagedLedgerInfo result, Stat version) {
                 // Update the list
-                ManagedLedgerInfo.Builder info = ManagedLedgerInfo.newBuilder(result);
+                ManagedLedgerInfo info = new ManagedLedgerInfo().copyFrom(result);
                 info.clearLedgerInfo();
-                info.addLedgerInfo(LedgerInfo.newBuilder().setLedgerId(l1info.getLedgerId()).build());
-                info.addLedgerInfo(l2info);
+                info.addLedgerInfo().setLedgerId(l1info.getLedgerId());
+                info.addLedgerInfo().copyFrom(l2info);
 
-                store.asyncUpdateLedgerIds("my_test_ledger", info.build(), version, new MetaStoreCallback<Void>() {
+                store.asyncUpdateLedgerIds("my_test_ledger", info, version, new MetaStoreCallback<Void>() {
                     @Override
                     public void operationComplete(Void result, Stat version) {
                         counter.countDown();
@@ -2522,16 +2521,16 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
         });
 
         l1.await();
-        ManagedLedgerInfo.Builder builder1 = ManagedLedgerInfo.newBuilder();
+        ManagedLedgerInfo builder1 = new ManagedLedgerInfo();
 
         // simulate test for old ledger with no timestampl
-        for (LedgerInfo info : storedMLInfo[0].getLedgerInfoList()) {
-            LedgerInfo noTimestamp = ManagedLedgerInfo.LedgerInfo.newBuilder().mergeFrom(info).clearTimestamp().build();
+        for (LedgerInfo info : storedMLInfo[0].getLedgerInfosList()) {
+            LedgerInfo noTimestamp = new ManagedLedgerInfo.LedgerInfo().copyFrom(info).clearTimestamp();
             assertFalse(noTimestamp.hasTimestamp(), "expected old version info with no timestamp");
-            builder1.addLedgerInfo(noTimestamp);
+            builder1.addLedgerInfo().copyFrom(noTimestamp);
 
         }
-        storedMLInfo[1] = builder1.build();
+        storedMLInfo[1] = builder1;
 
         // test timestamp on new ledger
 
@@ -3357,12 +3356,12 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
         factory.open(mLName);
         MetaStore store = new MetaStoreImpl(metadataStore, executor);
 
-        ManagedLedgerInfo.Builder builder = ManagedLedgerInfo.newBuilder();
-        builder.addProperties(MLDataFormats.KeyValue.newBuilder().setKey("key1").setValue("value1").build());
-        builder.addProperties(MLDataFormats.KeyValue.newBuilder().setKey("key2").setValue("value2").build());
+        ManagedLedgerInfo builder = new ManagedLedgerInfo();
+        builder.addProperty().setKey("key1").setValue("value1");
+        builder.addProperty().setKey("key2").setValue("value2");
 
         CountDownLatch l2 = new CountDownLatch(1);
-        store.asyncUpdateLedgerIds(mLName, builder.build(),
+        store.asyncUpdateLedgerIds(mLName, builder,
                 new Stat(mLName, 1, 0, 0, false, true),
                 new MetaStoreCallback<Void>() {
             @Override
@@ -4004,7 +4003,7 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
 
         Awaitility.await().untilAsserted(() -> {
             CompletableFuture<LedgerInfo> ledgerInfo = ledger.getLedgerInfo(ledgerId);
-            Assert.assertFalse(ledgerInfo.get(100, TimeUnit.MILLISECONDS).getOffloadContext().getComplete());
+            Assert.assertFalse(ledgerInfo.get(100, TimeUnit.MILLISECONDS).getOffloadContext().isComplete());
         });
     }
 
@@ -4250,7 +4249,7 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
         // prepare the arguments for the offloadLoop method
         CompletableFuture<PositionImpl> future = new CompletableFuture<>();
         Queue<LedgerInfo> ledgersToOffload = new LinkedList<>();
-        LedgerInfo ledgerInfo = LedgerInfo.getDefaultInstance().toBuilder().setLedgerId(1).setEntries(10).build();
+        LedgerInfo ledgerInfo = new LedgerInfo().setLedgerId(1).setEntries(10);
         ledgersToOffload.add(ledgerInfo);
         PositionImpl firstUnoffloaded = new PositionImpl(1, 0);
         Optional<Throwable> firstError = Optional.empty();

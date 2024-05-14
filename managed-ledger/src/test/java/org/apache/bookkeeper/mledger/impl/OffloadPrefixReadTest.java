@@ -30,7 +30,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import io.netty.buffer.ByteBuf;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -43,7 +42,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-
 import lombok.SneakyThrows;
 import org.apache.bookkeeper.client.api.DigestType;
 import org.apache.bookkeeper.client.api.LastConfirmedAndEntry;
@@ -88,9 +86,9 @@ public class OffloadPrefixReadTest extends MockedBookKeeperTestCase {
         ledger.offloadPrefix(ledger.getLastConfirmedEntry());
 
         assertEquals(ledger.getLedgersInfoAsList().size(), 3);
-        Assert.assertTrue(ledger.getLedgersInfoAsList().get(0).getOffloadContext().getComplete());
-        Assert.assertTrue(ledger.getLedgersInfoAsList().get(1).getOffloadContext().getComplete());
-        Assert.assertFalse(ledger.getLedgersInfoAsList().get(2).getOffloadContext().getComplete());
+        Assert.assertTrue(ledger.getLedgersInfoAsList().get(0).getOffloadContext().isComplete());
+        Assert.assertTrue(ledger.getLedgersInfoAsList().get(1).getOffloadContext().isComplete());
+        Assert.assertFalse(ledger.getLedgersInfoAsList().get(2).getOffloadContext().isComplete());
 
         UUID firstLedgerUUID = new UUID(ledger.getLedgersInfoAsList().get(0).getOffloadContext().getUidMsb(),
                 ledger.getLedgersInfoAsList().get(0).getOffloadContext().getUidLsb());
@@ -154,13 +152,13 @@ public class OffloadPrefixReadTest extends MockedBookKeeperTestCase {
 
         assertEquals(ledger.getLedgersInfoAsList().size(), 3);
         assertEquals(ledger.getLedgersInfoAsList().stream()
-                .filter(e -> e.getOffloadContext().getComplete()).count(), 2);
+                .filter(e -> e.getOffloadContext().isComplete()).count(), 2);
 
         LedgerInfo firstLedger = ledger.getLedgersInfoAsList().get(0);
-        Assert.assertTrue(firstLedger.getOffloadContext().getComplete());
+        Assert.assertTrue(firstLedger.getOffloadContext().isComplete());
         LedgerInfo secondLedger;
         secondLedger = ledger.getLedgersInfoAsList().get(1);
-        Assert.assertTrue(secondLedger.getOffloadContext().getComplete());
+        Assert.assertTrue(secondLedger.getOffloadContext().isComplete());
 
         UUID firstLedgerUUID = new UUID(firstLedger.getOffloadContext().getUidMsb(),
                 firstLedger.getOffloadContext().getUidLsb());
@@ -187,8 +185,8 @@ public class OffloadPrefixReadTest extends MockedBookKeeperTestCase {
         // assert bk ledger is deleted
         assertEventuallyTrue(() -> !bkc.getLedgers().contains(firstLedger.getLedgerId()));
         assertEventuallyTrue(() -> !bkc.getLedgers().contains(secondLedger.getLedgerId()));
-        Assert.assertTrue(ledger.getLedgersInfoAsList().get(0).getOffloadContext().getBookkeeperDeleted());
-        Assert.assertTrue(ledger.getLedgersInfoAsList().get(1).getOffloadContext().getBookkeeperDeleted());
+        Assert.assertTrue(ledger.getLedgersInfoAsList().get(0).getOffloadContext().isBookkeeperDeleted());
+        Assert.assertTrue(ledger.getLedgersInfoAsList().get(1).getOffloadContext().isBookkeeperDeleted());
 
         for (Entry e : cursor.readEntries(10)) {
             Assert.assertEquals(new String(e.getData()), "entry-" + i++);

@@ -106,7 +106,7 @@ public class OffloadIndexTest {
         metadataCustom.put("key1", "value1".getBytes(UTF_8));
         metadataCustom.put("key7", "value7".getBytes(UTF_8));
 
-        return LedgerInfo.newBuilder().setLedgerId(id).setEntries(5001).setSize(10000).build();
+        return new LedgerInfo().setLedgerId(id).setEntries(5001).setSize(10000);
     }
 
     // prepare metadata, then use builder to build a OffloadIndexBlockImpl

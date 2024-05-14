@@ -114,17 +114,14 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
 
                             store.put(path, new byte[0], Optional.of(-1L))
                                     .thenAccept(stat -> {
-                                        ManagedLedgerInfo.Builder ledgerBuilder = ManagedLedgerInfo.newBuilder();
+                                        ManagedLedgerInfo ledgerBuilder = new ManagedLedgerInfo();
                                         if (properties != null) {
                                             properties.forEach((k, v) -> {
-                                                ledgerBuilder.addProperties(
-                                                        MLDataFormats.KeyValue.newBuilder()
-                                                                .setKey(k)
-                                                                .setValue(v)
-                                                                .build());
+                                                ledgerBuilder.addProperty().setKey(k)
+                                                                .setValue(v);
                                             });
                                         }
-                                        callback.operationComplete(ledgerBuilder.build(), stat);
+                                        callback.operationComplete(ledgerBuilder, stat);
                                     }).exceptionally(ex -> {
                                         callback.operationFailed(getException(ex));
                                         return null;
@@ -156,7 +153,7 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
                 HashMap<String, String> propertiesMap = new HashMap<>(mlInfo.getPropertiesCount());
                 if (mlInfo.getPropertiesCount() > 0) {
                     for (int i = 0; i < mlInfo.getPropertiesCount(); i++) {
-                        MLDataFormats.KeyValue property = mlInfo.getProperties(i);
+                        MLDataFormats.KeyValue property = mlInfo.getPropertyAt(i);
                         propertiesMap.put(property.getKey(), property.getValue());
                     }
                 }
@@ -376,25 +373,28 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
     // - ledger has timestamp which is the normal case now
 
     private static ManagedLedgerInfo updateMLInfoTimestamp(ManagedLedgerInfo info) {
-        List<ManagedLedgerInfo.LedgerInfo> infoList = new ArrayList<>(info.getLedgerInfoCount());
+        List<ManagedLedgerInfo.LedgerInfo> infoList = new ArrayList<>(info.getLedgerInfosCount());
         long currentTime = System.currentTimeMillis();
 
-        for (ManagedLedgerInfo.LedgerInfo ledgerInfo : info.getLedgerInfoList()) {
+        for (ManagedLedgerInfo.LedgerInfo ledgerInfo : info.getLedgerInfosList()) {
             if (!ledgerInfo.hasTimestamp() || ledgerInfo.getTimestamp() == 0) {
-                ManagedLedgerInfo.LedgerInfo.Builder singleInfoBuilder = ledgerInfo.toBuilder();
+                ManagedLedgerInfo.LedgerInfo singleInfoBuilder =
+                        new ManagedLedgerInfo.LedgerInfo().copyFrom(ledgerInfo);
                 singleInfoBuilder.setTimestamp(currentTime);
-                infoList.add(singleInfoBuilder.build());
+                infoList.add(singleInfoBuilder);
             } else {
                 infoList.add(ledgerInfo);
             }
         }
-        ManagedLedgerInfo.Builder mlInfo = ManagedLedgerInfo.newBuilder();
-        mlInfo.addAllLedgerInfo(infoList);
+        ManagedLedgerInfo mlInfo = new ManagedLedgerInfo();
+        mlInfo.addAllLedgerInfos(infoList);
         if (info.hasTerminatedPosition()) {
-            mlInfo.setTerminatedPosition(info.getTerminatedPosition());
+            mlInfo.setTerminatedPosition()
+                    .setLedgerId(info.getTerminatedPosition().getLedgerId())
+                    .setEntryId(info.getTerminatedPosition().getEntryId());
         }
         mlInfo.addAllProperties(info.getPropertiesList());
-        return mlInfo.build();
+        return mlInfo;
     }
 
     private static MetaStoreException getException(Throwable t) {
@@ -413,11 +413,9 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
 
         int uncompressedSize = managedLedgerInfo.getSerializedSize();
         if (uncompressedSize > ledgerInfoCompressionConfig.getCompressSizeThresholdInBytes()) {
-            MLDataFormats.ManagedLedgerInfoMetadata mlInfoMetadata = MLDataFormats.ManagedLedgerInfoMetadata
-                    .newBuilder()
+            MLDataFormats.ManagedLedgerInfoMetadata mlInfoMetadata = new MLDataFormats.ManagedLedgerInfoMetadata()
                     .setCompressionType(compressionType)
-                    .setUncompressedSize(uncompressedSize)
-                    .build();
+                    .setUncompressedSize(uncompressedSize);
             return compressManagedInfo(managedLedgerInfo.toByteArray(), mlInfoMetadata.toByteArray(),
                     mlInfoMetadata.getSerializedSize(), compressionType);
         }
@@ -433,11 +431,9 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
 
         int uncompressedSize = managedCursorInfo.getSerializedSize();
         if (uncompressedSize > cursorInfoCompressionConfig.getCompressSizeThresholdInBytes()) {
-            MLDataFormats.ManagedCursorInfoMetadata metadata = MLDataFormats.ManagedCursorInfoMetadata
-                    .newBuilder()
+            MLDataFormats.ManagedCursorInfoMetadata metadata = new MLDataFormats.ManagedCursorInfoMetadata()
                     .setCompressionType(compressionType)
-                    .setUncompressedSize(uncompressedSize)
-                    .build();
+                    .setUncompressedSize(uncompressedSize);
             return compressManagedInfo(managedCursorInfo.toByteArray(), metadata.toByteArray(),
                     metadata.getSerializedSize(), compressionType);
         }
@@ -451,19 +447,27 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
         byte[] metadataBytes = extractCompressMetadataBytes(byteBuf);
         if (metadataBytes != null) {
             try {
-                MLDataFormats.ManagedLedgerInfoMetadata metadata =
-                        MLDataFormats.ManagedLedgerInfoMetadata.parseFrom(metadataBytes);
-                return ManagedLedgerInfo.parseFrom(getCompressionCodec(metadata.getCompressionType())
-                        .decode(byteBuf, metadata.getUncompressedSize()).nioBuffer());
+                MLDataFormats.ManagedLedgerInfoMetadata metadata = new MLDataFormats.ManagedLedgerInfoMetadata();
+                metadata.parseFrom(metadataBytes);
+                ManagedLedgerInfo info = new ManagedLedgerInfo();
+                ByteBuf uncompressed = getCompressionCodec(metadata.getCompressionType())
+                        .decode(byteBuf, metadata.getUncompressedSize());
+
+                info.parseFrom(uncompressed, uncompressed.readableBytes());
+                return info;
             } catch (Exception e) {
                 log.error("Failed to parse managedLedgerInfo metadata, "
                         + "fall back to parse managedLedgerInfo directly.", e);
-                return ManagedLedgerInfo.parseFrom(data);
+                ManagedLedgerInfo info = new ManagedLedgerInfo();
+                info.parseFrom(data);
+                return info;
             } finally {
                 byteBuf.release();
             }
         } else {
-            return ManagedLedgerInfo.parseFrom(data);
+            ManagedLedgerInfo info = new ManagedLedgerInfo();
+            info.parseFrom(data);
+            return info;
         }
     }
 
@@ -473,19 +477,30 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
         byte[] metadataBytes = extractCompressMetadataBytes(byteBuf);
         if (metadataBytes != null) {
             try {
-                MLDataFormats.ManagedCursorInfoMetadata metadata =
-                        MLDataFormats.ManagedCursorInfoMetadata.parseFrom(metadataBytes);
-                return ManagedCursorInfo.parseFrom(getCompressionCodec(metadata.getCompressionType())
-                        .decode(byteBuf, metadata.getUncompressedSize()).nioBuffer());
+                MLDataFormats.ManagedCursorInfoMetadata metadata = new MLDataFormats.ManagedCursorInfoMetadata();
+                metadata.parseFrom(metadataBytes);
+
+                ByteBuf uncompressed = getCompressionCodec(metadata.getCompressionType())
+                        .decode(byteBuf, metadata.getUncompressedSize());
+
+                ManagedCursorInfo info = new ManagedCursorInfo();
+                info.parseFrom(uncompressed, uncompressed.readableBytes());
+                return info;
+
             } catch (Exception e) {
                 log.error("Failed to parse ManagedCursorInfo metadata, "
                         + "fall back to parse ManagedCursorInfo directly", e);
-                return ManagedCursorInfo.parseFrom(data);
+
+                ManagedCursorInfo info = new ManagedCursorInfo();
+                info.parseFrom(data);
+                return info;
             } finally {
                 byteBuf.release();
             }
         } else {
-            return ManagedCursorInfo.parseFrom(data);
+            ManagedCursorInfo info = new ManagedCursorInfo();
+            info.parseFrom(data);
+            return info;
         }
     }
 

@@ -3224,8 +3224,8 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
                 lh.asyncReadEntries(lastEntry, lastEntry, (rc1, lh1, seq, ctx1) -> {
                     try {
                         LedgerEntry entry = seq.nextElement();
-                        PositionInfo positionInfo;
-                        positionInfo = PositionInfo.parseFrom(entry.getEntry());
+                        PositionInfo positionInfo = new PositionInfo();
+                        positionInfo.parseFrom(entry.getEntry());
                         individualDeletedMessagesCount.set(positionInfo.getIndividualDeletedMessagesCount());
                     } catch (Exception e) {
                     }
@@ -3405,9 +3405,9 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
         MetaStore mockMetaStore = mock(MetaStore.class);
         doAnswer(new Answer<Object>() {
             public Object answer(InvocationOnMock invocation) {
-                ManagedCursorInfo info = ManagedCursorInfo.newBuilder().setCursorsLedgerId(cursorsLedgerId)
+                ManagedCursorInfo info = new ManagedCursorInfo().setCursorsLedgerId(cursorsLedgerId)
                         .setMarkDeleteLedgerId(markDeleteLedgerId).setMarkDeleteEntryId(markDeleteEntryId)
-                        .setLastActive(0L).build();
+                        .setLastActive(0L);
                 Stat stat = mock(Stat.class);
                 MetaStoreCallback<ManagedCursorInfo> callback = (MetaStoreCallback<ManagedCursorInfo>) invocation
                         .getArguments()[2];
@@ -3466,12 +3466,11 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
         // Trigger the lastConfirmedEntry to move forward
         ml.addEntry(new byte[1]);
 
-        ManagedCursorInfo info = ManagedCursorInfo.newBuilder()
+        ManagedCursorInfo info = new ManagedCursorInfo()
                 .setCursorsLedgerId(c.getCursorLedger())
                 .setMarkDeleteLedgerId(markDeleteBeforeRecover.getLedgerId())
                 .setMarkDeleteEntryId(markDeleteBeforeRecover.getEntryId())
-                .setLastActive(0L)
-                .build();
+                .setLastActive(0L);
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean failed = new AtomicBoolean(false);
@@ -3533,12 +3532,11 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
         final Position markDeleteBeforeRecover = c.getMarkDeletedPosition();
         final Position readPositionBeforeRecover = c.getReadPosition();
 
-        ManagedCursorInfo info = ManagedCursorInfo.newBuilder()
+        ManagedCursorInfo info = new ManagedCursorInfo()
                 .setCursorsLedgerId(c.getCursorLedger())
                 .setMarkDeleteLedgerId(markDeleteBeforeRecover.getLedgerId())
                 .setMarkDeleteEntryId(markDeleteBeforeRecover.getEntryId())
-                .setLastActive(0L)
-                .build();
+                .setLastActive(0L);
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean failed = new AtomicBoolean(false);

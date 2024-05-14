@@ -36,7 +36,6 @@ import org.apache.bookkeeper.client.api.LedgerMetadata;
 import org.apache.bookkeeper.common.util.Backoff;
 import org.apache.bookkeeper.common.util.Retries;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
-import org.apache.bookkeeper.mledger.proto.MLDataFormats.KeyValue;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.LedgerInfo;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.OffloadContext;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.OffloadDriverMetadata;
@@ -91,20 +90,19 @@ public final class OffloadUtils {
         return defaultDriverName;
     }
 
-    public static void setOffloadDriverMetadata(LedgerInfo.Builder infoBuilder,
+    public static void setOffloadDriverMetadata(LedgerInfo infoBuilder,
                                                 String driverName,
                                                 Map<String, String> offloadDriverMetadata) {
-        infoBuilder.getOffloadContextBuilder()
-            .getDriverMetadataBuilder()
+        infoBuilder.setOffloadContext()
+            .setDriverMetadata()
             .setName(driverName);
-        infoBuilder.getOffloadContextBuilder().getDriverMetadataBuilder().clearProperties();
+        infoBuilder.setOffloadContext().setDriverMetadata().clearProperties();
         offloadDriverMetadata.forEach((k, v) -> infoBuilder
-                .getOffloadContextBuilder()
-                .getDriverMetadataBuilder()
-                .addProperties(KeyValue.newBuilder()
-                        .setKey(k)
-                        .setValue(v)
-                        .build()));
+                .setOffloadContext()
+                .setDriverMetadata()
+                .addProperty()
+                    .setKey(k)
+                    .setValue(v));
     }
 
     public static byte[] buildLedgerMetadataFormat(LedgerMetadata metadata) {

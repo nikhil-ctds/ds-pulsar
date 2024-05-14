@@ -31,7 +31,6 @@ import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Range;
 import com.google.common.util.concurrent.RateLimiter;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -357,11 +356,10 @@ public class ManagedCursorImpl implements ManagedCursor {
             return updateCursorPropertiesResult;
         }
 
-        ManagedCursorInfo copy = ManagedCursorInfo
-                .newBuilder(ManagedCursorImpl.this.managedCursorInfo)
+        ManagedCursorInfo copy = new ManagedCursorInfo()
+                .copyFrom(ManagedCursorImpl.this.managedCursorInfo)
                 .clearCursorProperties()
-                .addAllCursorProperties(buildStringPropertiesMap(newProperties))
-                .build();
+                .addAllCursorProperties(buildStringPropertiesMap(newProperties));
         final Stat lastCursorLedgerStat = ManagedCursorImpl.this.cursorLedgerStat;
         ledger.getStore().asyncUpdateCursorInfo(ledger.getName(),
                 name, copy, lastCursorLedgerStat, new MetaStoreCallback<>() {
@@ -485,7 +483,7 @@ public class ManagedCursorImpl implements ManagedCursor {
                     // Recover properties map
                     recoveredCursorProperties = new HashMap<>();
                     for (int i = 0; i < info.getCursorPropertiesCount(); i++) {
-                        StringProperty property = info.getCursorProperties(i);
+                        StringProperty property = info.getCursorPropertyAt(i);
                         recoveredCursorProperties.put(property.getName(), property.getValue());
                     }
                 }
@@ -505,7 +503,7 @@ public class ManagedCursorImpl implements ManagedCursor {
                         // Recover properties map
                         recoveredProperties = new HashMap<>();
                         for (int i = 0; i < info.getPropertiesCount(); i++) {
-                            LongProperty property = info.getProperties(i);
+                            LongProperty property = info.getPropertyAt(i);
                             recoveredProperties.put(property.getName(), property.getValue());
                         }
                     }
@@ -582,8 +580,9 @@ public class ManagedCursorImpl implements ManagedCursor {
                 mbean.addReadCursorLedgerSize(entry.getLength());
                 PositionInfo positionInfo;
                 try {
-                    positionInfo = PositionInfo.parseFrom(entry.getEntry());
-                } catch (InvalidProtocolBufferException e) {
+                    positionInfo = new PositionInfo();
+                    positionInfo.parseFrom(entry.getEntry());
+                } catch (Throwable e) {
                     callback.operationFailed(new ManagedLedgerException(e));
                     return;
                 }
@@ -593,7 +592,7 @@ public class ManagedCursorImpl implements ManagedCursor {
                     // Recover properties map
                     recoveredProperties = new HashMap<>();
                     for (int i = 0; i < positionInfo.getPropertiesCount(); i++) {
-                        LongProperty property = positionInfo.getProperties(i);
+                        LongProperty property = positionInfo.getPropertyAt(i);
                         recoveredProperties.put(property.getName(), property.getValue());
                     }
                 }
@@ -603,8 +602,8 @@ public class ManagedCursorImpl implements ManagedCursor {
                     recoverIndividualDeletedMessages(positionInfo.getIndividualDeletedMessagesList());
                 }
                 if (config.isDeletionAtBatchIndexLevelEnabled()
-                    && positionInfo.getBatchedEntryDeletionIndexInfoCount() > 0) {
-                    recoverBatchDeletedIndexes(positionInfo.getBatchedEntryDeletionIndexInfoList());
+                    && positionInfo.getBatchedEntryDeletionIndexInfosCount() > 0) {
+                    recoverBatchDeletedIndexes(positionInfo.getBatchedEntryDeletionIndexInfosList());
                 }
                 recoveredCursor(position, recoveredProperties, cursorProperties, lh);
                 callback.operationComplete();
@@ -662,10 +661,10 @@ public class ManagedCursorImpl implements ManagedCursor {
         try {
             this.batchDeletedIndexes.clear();
             batchDeletedIndexInfoList.forEach(batchDeletedIndexInfo -> {
-                if (batchDeletedIndexInfo.getDeleteSetCount() > 0) {
-                    long[] array = new long[batchDeletedIndexInfo.getDeleteSetCount()];
-                    for (int i = 0; i < batchDeletedIndexInfo.getDeleteSetList().size(); i++) {
-                        array[i] = batchDeletedIndexInfo.getDeleteSetList().get(i);
+                if (batchDeletedIndexInfo.getDeleteSetsCount() > 0) {
+                    long[] array = new long[batchDeletedIndexInfo.getDeleteSetsCount()];
+                    for (int i = 0; i < batchDeletedIndexInfo.getDeleteSetsCount(); i++) {
+                        array[i] = batchDeletedIndexInfo.getDeleteSetAt(i);
                     }
                     this.batchDeletedIndexes.put(PositionImpl.get(batchDeletedIndexInfo.getPosition().getLedgerId(),
                         batchDeletedIndexInfo.getPosition().getEntryId()), BitSetRecyclable.create().resetWords(array));
@@ -2676,7 +2675,7 @@ public class ManagedCursorImpl implements ManagedCursor {
 
         // When closing we store the last mark-delete position in the z-node itself, so we won't need the cursor ledger,
         // hence we write it as -1. The cursor ledger is deleted once the z-node write is confirmed.
-        ManagedCursorInfo.Builder info = ManagedCursorInfo.newBuilder() //
+        ManagedCursorInfo info = new ManagedCursorInfo() //
                 .setCursorsLedgerId(cursorsLedgerId) //
                 .setMarkDeleteLedgerId(position.getLedgerId()) //
                 .setMarkDeleteEntryId(position.getEntryId()) //
@@ -2687,7 +2686,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         if (persistIndividualDeletedMessageRanges) {
             info.addAllIndividualDeletedMessages(buildIndividualDeletedMessageRanges());
             if (config.isDeletionAtBatchIndexLevelEnabled()) {
-                info.addAllBatchedEntryDeletionIndexInfo(buildBatchEntryDeletionIndexInfoList());
+                info.addAllBatchedEntryDeletionIndexInfos(buildBatchEntryDeletionIndexInfoList());
             }
         }
 
@@ -2695,7 +2694,7 @@ public class ManagedCursorImpl implements ManagedCursor {
             log.debug("[{}][{}]  Closing cursor at md-position: {}", ledger.getName(), name, position);
         }
 
-        ManagedCursorInfo cursorInfo = info.build();
+        final ManagedCursorInfo cursorInfo = info;
         ledger.getStore().asyncUpdateCursorInfo(ledger.getName(), name, cursorInfo, lastCursorLedgerStat,
                 new MetaStoreCallback<Void>() {
                     @Override
@@ -2989,7 +2988,7 @@ public class ManagedCursorImpl implements ManagedCursor {
 
         List<LongProperty> longProperties = new ArrayList<>();
         properties.forEach((name, value) -> {
-            LongProperty lp = LongProperty.newBuilder().setName(name).setValue(value).build();
+            LongProperty lp = new LongProperty().setName(name).setValue(value);
             longProperties.add(lp);
         });
 
@@ -3003,7 +3002,7 @@ public class ManagedCursorImpl implements ManagedCursor {
 
         List<StringProperty> stringProperties = new ArrayList<>();
         properties.forEach((name, value) -> {
-            StringProperty sp = StringProperty.newBuilder().setName(name).setValue(value).build();
+            StringProperty sp = new StringProperty().setName(name).setValue(value);
             stringProperties.add(sp);
         });
 
@@ -3018,30 +3017,20 @@ public class ManagedCursorImpl implements ManagedCursor {
                 return Collections.emptyList();
             }
 
-            MLDataFormats.NestedPositionInfo.Builder nestedPositionBuilder = MLDataFormats.NestedPositionInfo
-                    .newBuilder();
 
-            MLDataFormats.MessageRange.Builder messageRangeBuilder = MLDataFormats.MessageRange
-                    .newBuilder();
 
             AtomicInteger acksSerializedSize = new AtomicInteger(0);
             List<MessageRange> rangeList = new ArrayList<>();
 
             individualDeletedMessages.forEachRawRange((lowerKey, lowerValue, upperKey, upperValue) -> {
-                MLDataFormats.NestedPositionInfo lowerPosition = nestedPositionBuilder
+                MLDataFormats.MessageRange messageRange = new MLDataFormats.MessageRange();
+
+                messageRange.setLowerEndpoint()
                         .setLedgerId(lowerKey)
-                        .setEntryId(lowerValue)
-                        .build();
-
-                MLDataFormats.NestedPositionInfo upperPosition = nestedPositionBuilder
+                        .setEntryId(lowerValue);
+                messageRange.setUpperEndpoint()
                         .setLedgerId(upperKey)
-                        .setEntryId(upperValue)
-                        .build();
-
-                MessageRange messageRange = messageRangeBuilder
-                        .setLowerEndpoint(lowerPosition)
-                        .setUpperEndpoint(upperPosition)
-                        .build();
+                        .setEntryId(upperValue);
 
                 acksSerializedSize.addAndGet(messageRange.getSerializedSize());
                 rangeList.add(messageRange);
@@ -3063,25 +3052,21 @@ public class ManagedCursorImpl implements ManagedCursor {
             if (!config.isDeletionAtBatchIndexLevelEnabled() || batchDeletedIndexes.isEmpty()) {
                 return Collections.emptyList();
             }
-            MLDataFormats.NestedPositionInfo.Builder nestedPositionBuilder = MLDataFormats.NestedPositionInfo
-                    .newBuilder();
-            MLDataFormats.BatchedEntryDeletionIndexInfo.Builder batchDeletedIndexInfoBuilder = MLDataFormats
-                    .BatchedEntryDeletionIndexInfo.newBuilder();
+            MLDataFormats.BatchedEntryDeletionIndexInfo batchDeletedIndexInfoBuilder = new MLDataFormats
+                    .BatchedEntryDeletionIndexInfo();
             List<MLDataFormats.BatchedEntryDeletionIndexInfo> result = new ArrayList<>();
             Iterator<Map.Entry<PositionImpl, BitSetRecyclable>> iterator = batchDeletedIndexes.entrySet().iterator();
             while (iterator.hasNext() && result.size() < config.getMaxBatchDeletedIndexToPersist()) {
                 Map.Entry<PositionImpl, BitSetRecyclable> entry = iterator.next();
-                nestedPositionBuilder.setLedgerId(entry.getKey().getLedgerId());
-                nestedPositionBuilder.setEntryId(entry.getKey().getEntryId());
-                batchDeletedIndexInfoBuilder.setPosition(nestedPositionBuilder.build());
+                batchDeletedIndexInfoBuilder.setPosition()
+                        .setLedgerId(entry.getKey().getLedgerId())
+                        .setEntryId(entry.getKey().getEntryId());
                 long[] array = entry.getValue().toLongArray();
-                List<Long> deleteSet = new ArrayList<>(array.length);
                 for (long l : array) {
-                    deleteSet.add(l);
+                    batchDeletedIndexInfoBuilder.addDeleteSet(l);
                 }
                 batchDeletedIndexInfoBuilder.clearDeleteSet();
-                batchDeletedIndexInfoBuilder.addAllDeleteSet(deleteSet);
-                result.add(batchDeletedIndexInfoBuilder.build());
+                result.add(batchDeletedIndexInfoBuilder);
             }
             return result;
         } finally {
@@ -3091,11 +3076,12 @@ public class ManagedCursorImpl implements ManagedCursor {
 
     void persistPositionToLedger(final LedgerHandle lh, MarkDeleteEntry mdEntry, final VoidCallback callback) {
         PositionImpl position = mdEntry.newPosition;
-        PositionInfo pi = PositionInfo.newBuilder().setLedgerId(position.getLedgerId())
+        PositionInfo pi = new PositionInfo()
+                .setLedgerId(position.getLedgerId())
                 .setEntryId(position.getEntryId())
                 .addAllIndividualDeletedMessages(buildIndividualDeletedMessageRanges())
-                .addAllBatchedEntryDeletionIndexInfo(buildBatchEntryDeletionIndexInfoList())
-                .addAllProperties(buildPropertiesMap(mdEntry.properties)).build();
+                .addAllBatchedEntryDeletionIndexInfos(buildBatchEntryDeletionIndexInfoList())
+                .addAllProperties(buildPropertiesMap(mdEntry.properties));
 
 
         if (log.isDebugEnabled()) {

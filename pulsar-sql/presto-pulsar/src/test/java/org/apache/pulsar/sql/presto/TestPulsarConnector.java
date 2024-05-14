@@ -406,7 +406,9 @@ public abstract class TestPulsarConnector {
                     .setProducerName("test-producer").setSequenceId(i)
                     .setPublishTime(currentTimeMicros / 1000 + i);
 
-            Schema schema = topicsToSchemas.get(topicSchemaName).getType() == SchemaType.AVRO ? AvroSchema.of(SchemaDefinition.<Foo>builder().withPojo(Foo.class).build()) : JSONSchema.of(SchemaDefinition.<Foo>builder().withPojo(Foo.class).build());
+            Schema schema = topicsToSchemas.get(topicSchemaName).getType() == SchemaType.AVRO ?
+                    AvroSchema.of(SchemaDefinition.<Foo>builder().withPojo(Foo.class).build())
+                    : JSONSchema.of(SchemaDefinition.<Foo>builder().withPojo(Foo.class).build());
 
             ByteBuf payload = io.netty.buffer.Unpooled
                     .copiedBuffer(schema.encode(foo));
@@ -629,7 +631,8 @@ public abstract class TestPulsarConnector {
                                             .setProducerName("test-producer").setSequenceId(positions.get(topic))
                                             .setPublishTime(System.currentTimeMillis());
 
-                                    Schema schema = topicsToSchemas.get(schemaName).getType() == SchemaType.AVRO ? AvroSchema.of(Foo.class) : JSONSchema.of(Foo.class);
+                                    Schema schema = topicsToSchemas.get(schemaName).getType() == SchemaType.AVRO
+                                            ? AvroSchema.of(Foo.class) : JSONSchema.of(Foo.class);
 
                                     ByteBuf payload = io.netty.buffer.Unpooled
                                             .copiedBuffer(schema.encode(foo));
@@ -696,7 +699,8 @@ public abstract class TestPulsarConnector {
                     }
                 });
 
-                when(readOnlyCursor.getCurrentLedgerInfo()).thenReturn(MLDataFormats.ManagedLedgerInfo.LedgerInfo.newBuilder().setLedgerId(0).build());
+                when(readOnlyCursor.getCurrentLedgerInfo()).thenReturn(new MLDataFormats.ManagedLedgerInfo.LedgerInfo()
+                        .setLedgerId(0));
 
                 return readOnlyCursor;
             }
