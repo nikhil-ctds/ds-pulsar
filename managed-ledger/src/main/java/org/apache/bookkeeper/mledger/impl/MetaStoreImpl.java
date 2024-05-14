@@ -450,9 +450,14 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
                 MLDataFormats.ManagedLedgerInfoMetadata metadata = new MLDataFormats.ManagedLedgerInfoMetadata();
                 metadata.parseFrom(metadataBytes);
                 ManagedLedgerInfo info = new ManagedLedgerInfo();
-                ByteBuf uncompressed = getCompressionCodec(metadata.getCompressionType())
+                ByteBuf decode = getCompressionCodec(metadata.getCompressionType())
                         .decode(byteBuf, metadata.getUncompressedSize());
 
+                // unfortunately have to copy buffer to unpooled instead of passing `decode` directly.
+                // parseFrom() keeps reference to ByteBuf internally
+                // and does not provide a way to release it.
+                ByteBuf uncompressed = Unpooled.copiedBuffer(decode);
+                decode.release();
                 info.parseFrom(uncompressed, uncompressed.readableBytes());
                 return info;
             } catch (Exception e) {
@@ -480,13 +485,17 @@ public class MetaStoreImpl implements MetaStore, Consumer<Notification> {
                 MLDataFormats.ManagedCursorInfoMetadata metadata = new MLDataFormats.ManagedCursorInfoMetadata();
                 metadata.parseFrom(metadataBytes);
 
-                ByteBuf uncompressed = getCompressionCodec(metadata.getCompressionType())
+                ByteBuf decode = getCompressionCodec(metadata.getCompressionType())
                         .decode(byteBuf, metadata.getUncompressedSize());
 
                 ManagedCursorInfo info = new ManagedCursorInfo();
+                // unfortunately have to copy buffer to unpooled instead of passing `decode` directly.
+                // parseFrom() keeps reference to ByteBuf internally
+                // and does not provide a way to release it.
+                ByteBuf uncompressed = Unpooled.copiedBuffer(decode);
+                decode.release();
                 info.parseFrom(uncompressed, uncompressed.readableBytes());
                 return info;
-
             } catch (Exception e) {
                 log.error("Failed to parse ManagedCursorInfo metadata, "
                         + "fall back to parse ManagedCursorInfo directly", e);
