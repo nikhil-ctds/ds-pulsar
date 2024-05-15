@@ -24,23 +24,6 @@ public abstract class LightProtoHelper {
 
     public static MLDataFormats.ManagedLedgerInfo.LedgerInfo createLedgerInfo() {
         MLDataFormats.ManagedLedgerInfo.LedgerInfo li =  new MLDataFormats.ManagedLedgerInfo.LedgerInfo();
-
-        // light proto doesn't return MLDataFormats.OffloadContext.getDefaultInstance()
-        // if it wasn't explicitly set and a lot of code expects that behavior
-        li.setOffloadContext()
-                .setBookkeeperDeleted(false)
-                .setComplete(false)
-                .setTimestamp(-1L); // like protobuf default instance
-        li.setOffloadContext()
-                .setDriverMetadata()
-                .setName(""); // like protobuf default instance
-
-// stuff like this seems to be a bad idea,
-// unlike protobuf that just creates empty collection,
-// these will add empty object to that collection.
-// so this is something we can't mimic from protobuf
-//   li.setOffloadContext().setDriverMetadata().addProperty();
-//   li.setOffloadContext().addOffloadSegment();
         return li;
     }
 }

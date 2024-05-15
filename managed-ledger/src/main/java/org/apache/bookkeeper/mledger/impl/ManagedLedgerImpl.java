@@ -2774,7 +2774,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             }
 
             for (LedgerInfo ls : ledgers.values()) {
-                if (isOffloadedNeedsDelete(ls.getOffloadContext(), optionalOffloadPolicies)
+                if (ls.hasOffloadContext() && isOffloadedNeedsDelete(ls.getOffloadContext(), optionalOffloadPolicies)
                         && !ledgersToDelete.contains(ls)) {
                     log.debug("[{}] Ledger {} has been offloaded, bookkeeper ledger needs to be deleted", name,
                             ls.getLedgerId());
@@ -3064,12 +3064,12 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
     }
 
     private void asyncDeleteLedger(long ledgerId, LedgerInfo info) {
-        if (!info.getOffloadContext().isBookkeeperDeleted()) {
+        if (!info.hasOffloadContext() || !info.getOffloadContext().isBookkeeperDeleted()) {
             // only delete if it hasn't been previously deleted for offload
             asyncDeleteLedger(ledgerId, DEFAULT_LEDGER_DELETE_RETRIES);
         }
 
-        if (info.getOffloadContext().hasUidMsb()) {
+        if (info.hasOffloadContext() && info.getOffloadContext().hasUidMsb()) {
             UUID uuid = new UUID(info.getOffloadContext().getUidMsb(), info.getOffloadContext().getUidLsb());
             OffloadUtils.cleanupOffloaded(ledgerId, uuid, config,
                     OffloadUtils.getOffloadDriverMetadata(info, config.getLedgerOffloader().getOffloadDriverMetadata()),
@@ -3234,7 +3234,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             for (LedgerInfo ls : ledgers.headMap(current).values()) {
                 if (requestOffloadTo.getLedgerId() > ls.getLedgerId()) {
                     // don't offload if ledger has already been offloaded, or is empty
-                    if (!ls.getOffloadContext().isComplete() && ls.getSize() > 0) {
+                    if (ls.hasOffloadContext() && !ls.getOffloadContext().isComplete() && ls.getSize() > 0) {
                         ledgersToOffload.add(ls);
                     }
                 } else {
@@ -3442,6 +3442,10 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
         log.info("[{}] Preparing metadata to offload ledger {} with uuid {}", name, ledgerId, uuid);
         return transformLedgerInfo(ledgerId,
                                    (oldInfo) -> {
+                                       if (!oldInfo.hasOffloadContext()) {
+                                          log.warn("oldInfo does not have offloadContext {}", oldInfo);
+                                          return oldInfo;
+                                       }
                                        if (oldInfo.getOffloadContext().hasUidMsb()) {
                                            UUID oldUuid = new UUID(oldInfo.getOffloadContext().getUidMsb(),
                                                                    oldInfo.getOffloadContext().getUidLsb());
@@ -3482,6 +3486,11 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
         log.info("[{}] Completing metadata for offload of ledger {} with uuid {}", name, ledgerId, uuid);
         return transformLedgerInfo(ledgerId,
                                    (oldInfo) -> {
+                                       if (!oldInfo.hasOffloadContext()) {
+                                            throw new OffloadConflict(
+                                                    "Ledger info for ledgerId=" + ledgerId
+                                                            + ") does not have offload context");
+                                       }
                                        UUID existingUuid = new UUID(oldInfo.getOffloadContext().getUidMsb(),
                                                                     oldInfo.getOffloadContext().getUidLsb());
                                        if (existingUuid.equals(uuid)) {

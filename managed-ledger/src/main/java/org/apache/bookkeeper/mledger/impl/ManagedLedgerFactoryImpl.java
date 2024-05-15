@@ -959,7 +959,7 @@ public class ManagedLedgerFactoryImpl implements ManagedLedgerFactory {
 
                             MLDataFormats.ManagedLedgerInfo.LedgerInfo ls = ledgerInfos.get(li.ledgerId);
 
-                            if (ls.getOffloadContext().hasUidMsb()) {
+                            if (ls.hasOffloadContext() && ls.getOffloadContext().hasUidMsb()) {
                                 MLDataFormats.ManagedLedgerInfo.LedgerInfo newInfoBuilder =
                                         new MLDataFormats.ManagedLedgerInfo.LedgerInfo().copyFrom(ls);
                                 newInfoBuilder.setOffloadContext().setBookkeeperDeleted(true);

@@ -172,6 +172,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         Assert.assertEquals(ledger.getLedgersInfoAsList().size(), 2);
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                            .filter(e -> e.hasOffloadContext())
                             .filter(e -> e.getOffloadContext().isComplete())
                             .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                             offloader.offloadedLedgers());
@@ -193,6 +194,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         // ledger still exists in list
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                            .filter(e -> e.hasOffloadContext())
                             .filter(e -> e.getOffloadContext().isComplete())
                             .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                             offloader.offloadedLedgers());
@@ -234,6 +236,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         Assert.assertEquals(ledger.getLedgersInfoAsList().size(), 2);
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                        .filter(e -> e.hasOffloadContext())
                         .filter(e -> e.getOffloadContext().isComplete())
                         .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                 offloader.offloadedLedgers());
@@ -241,6 +244,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         // ledger still exists in list
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                        .filter(e -> e.hasOffloadContext())
                         .filter(e -> e.getOffloadContext().isComplete())
                         .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                 offloader.offloadedLedgers());
@@ -282,6 +286,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         Assert.assertEquals(ledger.getLedgersInfoAsList().size(), 2);
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                            .filter(e -> e.hasOffloadContext())
                             .filter(e -> e.getOffloadContext().isComplete())
                             .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                             offloader.offloadedLedgers());
@@ -330,6 +335,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         Assert.assertEquals(ledger.getLedgersInfoAsList().size(), 2);
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                            .filter(e -> e.hasOffloadContext())
                             .filter(e -> e.getOffloadContext().isComplete())
                             .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                             offloader.offloadedLedgers());
@@ -352,6 +358,7 @@ public class OffloadLedgerDeleteTest extends MockedBookKeeperTestCase {
 
         // ledger still exists in list
         Assert.assertEquals(ledger.getLedgersInfoAsList().stream()
+                            .filter(e -> e.hasOffloadContext())
                             .filter(e -> e.getOffloadContext().isComplete())
                             .map(e -> e.getLedgerId()).collect(Collectors.toSet()),
                             offloader.offloadedLedgers());
