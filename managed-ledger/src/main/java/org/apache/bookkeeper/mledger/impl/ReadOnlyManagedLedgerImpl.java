@@ -18,6 +18,7 @@
  */
 package org.apache.bookkeeper.mledger.impl;
 
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
 import com.google.common.collect.Range;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -35,8 +36,6 @@ import org.apache.bookkeeper.mledger.impl.MetaStore.MetaStoreCallback;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.LedgerInfo;
 import org.apache.pulsar.metadata.api.Stat;
-
-import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
 
 @Slf4j
 public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
