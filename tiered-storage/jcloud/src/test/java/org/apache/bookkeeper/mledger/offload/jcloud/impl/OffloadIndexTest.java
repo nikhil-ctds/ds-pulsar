@@ -35,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.LedgerMetadataBuilder;
 import org.apache.bookkeeper.client.api.DigestType;
 import org.apache.bookkeeper.client.api.LedgerMetadata;
+import org.apache.bookkeeper.mledger.impl.LightProtoHelper;
 import org.apache.bookkeeper.mledger.offload.jcloud.OffloadIndexBlock;
 import org.apache.bookkeeper.mledger.offload.jcloud.OffloadIndexBlockBuilder;
 import org.apache.bookkeeper.mledger.offload.jcloud.OffloadIndexEntry;
@@ -106,7 +107,7 @@ public class OffloadIndexTest {
         metadataCustom.put("key1", "value1".getBytes(UTF_8));
         metadataCustom.put("key7", "value7".getBytes(UTF_8));
 
-        return new LedgerInfo().setLedgerId(id).setEntries(5001).setSize(10000);
+        return LightProtoHelper.createLedgerInfo().setLedgerId(id).setEntries(5001).setSize(10000);
     }
 
     // prepare metadata, then use builder to build a OffloadIndexBlockImpl

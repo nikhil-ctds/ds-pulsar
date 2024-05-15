@@ -43,6 +43,8 @@ import org.apache.pulsar.common.allocator.PulsarByteBufAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
+
 public class OffloadIndexBlockV2Impl implements OffloadIndexBlockV2 {
     private static final Logger log = LoggerFactory.getLogger(OffloadIndexBlockImpl.class);
 
@@ -217,7 +219,7 @@ public class OffloadIndexBlockV2Impl implements OffloadIndexBlockV2 {
     }
 
     private static LedgerInfo parseLedgerInfo(byte[] bytes) throws IOException {
-        LedgerInfo info = new LedgerInfo();
+        LedgerInfo info = createLedgerInfo();
         info.parseFrom(bytes);
         return info;
     }

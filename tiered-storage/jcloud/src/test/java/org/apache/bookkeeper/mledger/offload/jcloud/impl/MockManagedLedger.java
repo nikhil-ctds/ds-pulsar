@@ -37,6 +37,8 @@ import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.Ledge
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
+
 @Slf4j
 public class MockManagedLedger implements ManagedLedger {
     @Override
@@ -351,13 +353,13 @@ public class MockManagedLedger implements ManagedLedger {
 
     @Override
     public CompletableFuture<LedgerInfo> getLedgerInfo(long ledgerId) {
-        final LedgerInfo build = new LedgerInfo().setLedgerId(ledgerId).setSize(100).setEntries(20);
+        final LedgerInfo build = createLedgerInfo().setLedgerId(ledgerId).setSize(100).setEntries(20);
         return CompletableFuture.completedFuture(build);
     }
 
     @Override
     public Optional<LedgerInfo> getOptionalLedgerInfo(long ledgerId) {
-        final LedgerInfo build = new LedgerInfo().setLedgerId(ledgerId).setSize(100).setEntries(20);
+        final LedgerInfo build = createLedgerInfo().setLedgerId(ledgerId).setSize(100).setEntries(20);
         return Optional.of(build);
     }
 
