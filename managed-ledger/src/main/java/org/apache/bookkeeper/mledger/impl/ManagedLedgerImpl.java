@@ -21,6 +21,7 @@ package org.apache.bookkeeper.mledger.impl;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.min;
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
 import static org.apache.bookkeeper.mledger.util.Errors.isNoSuchLedgerExistsException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BoundType;
@@ -414,7 +415,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                                 log.debug("[{}] Opened ledger {}: {}", name, id, BKException.getMessage(rc));
                             }
                             if (rc == BKException.Code.OK) {
-                                LedgerInfo info = new LedgerInfo().setLedgerId(id)
+                                LedgerInfo info = createLedgerInfo().setLedgerId(id)
                                         .setEntries(lh.getLastAddConfirmed() + 1).setSize(lh.getLength())
                                         .setTimestamp(clock.millis());
                                 ledgers.put(id, info);
@@ -546,7 +547,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                     }
                 }
 
-                LedgerInfo info = new LedgerInfo().setLedgerId(lh.getId()).setTimestamp(0);
+                LedgerInfo info = createLedgerInfo().setLedgerId(lh.getId()).setTimestamp(0);
                 ledgers.put(lh.getId(), info);
 
                 // Save it back to ensure all nodes exist
@@ -1574,7 +1575,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             lastLedgerCreationFailureTimestamp = clock.millis();
         } else {
             log.info("[{}] Created new ledger {}", name, lh.getId());
-            LedgerInfo newLedger = new LedgerInfo().setLedgerId(lh.getId()).setTimestamp(0);
+            LedgerInfo newLedger = createLedgerInfo().setLedgerId(lh.getId()).setTimestamp(0);
             final MetaStoreCallback<Void> cb = new MetaStoreCallback<Void>() {
                 @Override
                 public void operationComplete(Void v, Stat stat) {
@@ -1743,7 +1744,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             log.debug("[{}] Ledger has been closed id={} entries={}", name, lh.getId(), entriesInLedger);
         }
         if (entriesInLedger > 0) {
-            LedgerInfo info = new LedgerInfo().setLedgerId(lh.getId()).setEntries(entriesInLedger)
+            LedgerInfo info = createLedgerInfo().setLedgerId(lh.getId()).setEntries(entriesInLedger)
                     .setSize(lh.getLength()).setTimestamp(clock.millis());
             ledgers.put(lh.getId(), info);
         } else {
@@ -2806,7 +2807,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             doDeleteLedgers(ledgersToDelete);
 
             for (LedgerInfo ls : offloadedLedgersToDelete) {
-                LedgerInfo newInfoBuilder = new LedgerInfo();
+                LedgerInfo newInfoBuilder = createLedgerInfo();
                 newInfoBuilder.setOffloadContext().setBookkeeperDeleted(true);
                 String driverName = OffloadUtils.getOffloadDriverName(ls,
                         config.getLedgerOffloader().getOffloadDriverName());
@@ -3456,7 +3457,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                                                name,
                                                scheduledExecutor);
                                        }
-                                       LedgerInfo builder = new LedgerInfo().copyFrom(oldInfo);
+                                       LedgerInfo builder = createLedgerInfo().copyFrom(oldInfo);
                                        builder.setOffloadContext()
                                            .setUidMsb(uuid.getMostSignificantBits())
                                            .setUidLsb(uuid.getLeastSignificantBits());
@@ -3484,7 +3485,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
                                        UUID existingUuid = new UUID(oldInfo.getOffloadContext().getUidMsb(),
                                                                     oldInfo.getOffloadContext().getUidLsb());
                                        if (existingUuid.equals(uuid)) {
-                                           LedgerInfo builder = new LedgerInfo().copyFrom(oldInfo);
+                                           LedgerInfo builder = createLedgerInfo().copyFrom(oldInfo);
                                            builder.setOffloadContext()
                                                .setTimestamp(clock.millis())
                                                .setComplete(true);

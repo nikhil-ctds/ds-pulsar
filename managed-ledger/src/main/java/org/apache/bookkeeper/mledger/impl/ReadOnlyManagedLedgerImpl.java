@@ -36,6 +36,8 @@ import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.ManagedLedgerInfo.LedgerInfo;
 import org.apache.pulsar.metadata.api.Stat;
 
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
+
 @Slf4j
 public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
 
@@ -67,7 +69,7 @@ public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
                             .withDigestType(config.getDigestType()).withPassword(config.getPassword()).execute()
                             .thenAccept(readHandle -> {
                                 readHandle.readLastAddConfirmedAsync().thenAccept(lastAddConfirmed -> {
-                                    LedgerInfo info = new LedgerInfo().setLedgerId(lastLedgerId)
+                                    LedgerInfo info = createLedgerInfo().setLedgerId(lastLedgerId)
                                             .setEntries(lastAddConfirmed + 1).setSize(readHandle.getLength())
                                             .setTimestamp(clock.millis());
                                     ledgers.put(lastLedgerId, info);
@@ -77,7 +79,7 @@ public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
                                     if (ex instanceof CompletionException
                                             && ex.getCause() instanceof IllegalArgumentException) {
                                         // The last ledger was empty, so we cannot read the last add confirmed.
-                                        LedgerInfo info = new LedgerInfo().setLedgerId(lastLedgerId)
+                                        LedgerInfo info = createLedgerInfo().setLedgerId(lastLedgerId)
                                                 .setEntries(0).setSize(0).setTimestamp(clock.millis());
                                         ledgers.put(lastLedgerId, info);
                                         future.complete(null);
@@ -90,7 +92,7 @@ public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
                                 if (ex instanceof CompletionException
                                         && ex.getCause() instanceof ArrayIndexOutOfBoundsException) {
                                     // The last ledger was empty, so we cannot read the last add confirmed.
-                                    LedgerInfo info = new LedgerInfo().setLedgerId(lastLedgerId).setEntries(0)
+                                    LedgerInfo info = createLedgerInfo().setLedgerId(lastLedgerId).setEntries(0)
                                             .setSize(0).setTimestamp(clock.millis());
                                     ledgers.put(lastLedgerId, info);
                                     future.complete(null);

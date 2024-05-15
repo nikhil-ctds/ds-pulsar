@@ -18,6 +18,7 @@
  */
 package org.apache.bookkeeper.mledger.impl;
 
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
 import static org.apache.bookkeeper.mledger.util.Errors.isNoSuchLedgerExistsException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -113,7 +114,7 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                     }
                     if (rc == BKException.Code.OK) {
                         LedgerInfo info =
-                                new LedgerInfo()
+                                createLedgerInfo()
                                         .setLedgerId(lastLedgerId)
                                         .setEntries(lh.getLastAddConfirmed() + 1)
                                         .setSize(lh.getLength())
@@ -323,7 +324,7 @@ public class ShadowManagedLedgerImpl extends ManagedLedgerImpl {
                             log.debug("[{}] Opened new source ledger {}", name, lastLedgerId);
                         }
                         if (rc == BKException.Code.OK) {
-                            LedgerInfo info = new LedgerInfo()
+                            LedgerInfo info = createLedgerInfo()
                                     .setLedgerId(lastLedgerId)
                                     .setEntries(lh.getLastAddConfirmed() + 1)
                                     .setSize(lh.getLength())

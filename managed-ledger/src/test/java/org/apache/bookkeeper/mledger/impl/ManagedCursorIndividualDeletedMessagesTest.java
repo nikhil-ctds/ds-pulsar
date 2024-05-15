@@ -114,7 +114,7 @@ public class ManagedCursorIndividualDeletedMessagesTest {
     }
 
     private static LedgerInfo createLedgerInfo(long ledgerId, long entries, long size) {
-        return new LedgerInfo().setLedgerId(ledgerId).setEntries(entries).setSize(size)
+        return LightProtoHelper.createLedgerInfo().setLedgerId(ledgerId).setEntries(entries).setSize(size)
                 .setTimestamp(System.currentTimeMillis());
     }
 

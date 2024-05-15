@@ -3723,6 +3723,7 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
         ManagedLedgerConfig managedLedgerConfig = new ManagedLedgerConfig();
         // Make sure the cursor metadata updated by the cursor ledger ID.
         managedLedgerConfig.setMaxUnackedRangesToPersistInMetadataStore(-1);
+        managedLedgerConfig.setDeletionAtBatchIndexLevelEnabled(true);
         ManagedLedger ledger = factory.open("test_batch_indexes_deletion_persistent", managedLedgerConfig);
         ManagedCursor cursor = ledger.openCursor("c1");
 

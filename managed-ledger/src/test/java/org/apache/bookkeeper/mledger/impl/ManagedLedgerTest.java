@@ -19,6 +19,7 @@
 package org.apache.bookkeeper.mledger.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.bookkeeper.mledger.impl.LightProtoHelper.createLedgerInfo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -4249,7 +4250,7 @@ public class ManagedLedgerTest extends MockedBookKeeperTestCase {
         // prepare the arguments for the offloadLoop method
         CompletableFuture<PositionImpl> future = new CompletableFuture<>();
         Queue<LedgerInfo> ledgersToOffload = new LinkedList<>();
-        LedgerInfo ledgerInfo = new LedgerInfo().setLedgerId(1).setEntries(10);
+        LedgerInfo ledgerInfo = createLedgerInfo().setLedgerId(1).setEntries(10);
         ledgersToOffload.add(ledgerInfo);
         PositionImpl firstUnoffloaded = new PositionImpl(1, 0);
         Optional<Throwable> firstError = Optional.empty();
