@@ -2807,7 +2807,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             doDeleteLedgers(ledgersToDelete);
 
             for (LedgerInfo ls : offloadedLedgersToDelete) {
-                LedgerInfo newInfoBuilder = createLedgerInfo();
+                LedgerInfo newInfoBuilder = createLedgerInfo().copyFrom(ls);
                 newInfoBuilder.setOffloadContext().setBookkeeperDeleted(true);
                 String driverName = OffloadUtils.getOffloadDriverName(ls,
                         config.getLedgerOffloader().getOffloadDriverName());
