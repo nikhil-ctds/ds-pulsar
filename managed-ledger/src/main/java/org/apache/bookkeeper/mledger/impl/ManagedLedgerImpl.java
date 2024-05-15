@@ -3783,7 +3783,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             return null;
         }
         if (ledgerId > lastConfirmedEntry.getLedgerId()) {
-            checkState(ledgers.get(ledgerId).getEntries() == 0);
+            checkState(!ledgers.get(ledgerId).hasEntries() || ledgers.get(ledgerId).getEntries() == 0);
             ledgerId = lastConfirmedEntry.getLedgerId();
         }
         return new PositionImpl(ledgerId, -1);
