@@ -3076,12 +3076,12 @@ public class ManagedCursorImpl implements ManagedCursor {
             if (!config.isDeletionAtBatchIndexLevelEnabled() || batchDeletedIndexes.isEmpty()) {
                 return Collections.emptyList();
             }
-            MLDataFormats.BatchedEntryDeletionIndexInfo batchDeletedIndexInfoBuilder = new MLDataFormats
-                    .BatchedEntryDeletionIndexInfo();
             List<MLDataFormats.BatchedEntryDeletionIndexInfo> result = new ArrayList<>();
             Iterator<Map.Entry<PositionImpl, BitSetRecyclable>> iterator = batchDeletedIndexes.entrySet().iterator();
             while (iterator.hasNext() && result.size() < config.getMaxBatchDeletedIndexToPersist()) {
                 Map.Entry<PositionImpl, BitSetRecyclable> entry = iterator.next();
+                MLDataFormats.BatchedEntryDeletionIndexInfo batchDeletedIndexInfoBuilder = new MLDataFormats
+                        .BatchedEntryDeletionIndexInfo();
                 batchDeletedIndexInfoBuilder.setPosition()
                         .setLedgerId(entry.getKey().getLedgerId())
                         .setEntryId(entry.getKey().getEntryId());
@@ -3089,7 +3089,6 @@ public class ManagedCursorImpl implements ManagedCursor {
                 for (long l : array) {
                     batchDeletedIndexInfoBuilder.addDeleteSet(l);
                 }
-                batchDeletedIndexInfoBuilder.clearDeleteSet();
                 result.add(batchDeletedIndexInfoBuilder);
             }
             return result;
