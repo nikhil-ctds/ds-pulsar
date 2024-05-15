@@ -97,7 +97,9 @@ public class ManagedCursorInfoMetadataTest {
         // parse compression data and unCompression data, check their results.
         MLDataFormats.ManagedCursorInfo info1 = metaStore.parseManagedCursorInfo(compressionBytes);
         MLDataFormats.ManagedCursorInfo info2 = metaStore.parseManagedCursorInfo(managedCursorInfo.toByteArray());
-        assertEquals(info1, info2);
+        assertEquals(info1.toByteArray(), info2.toByteArray());
+        assertEquals(info1.getCursorsLedgerId(), info2.getCursorsLedgerId());
+        assertEquals(info1.getMarkDeleteLedgerId(), info2.getMarkDeleteLedgerId());
     }
 
     @Test(dataProvider = "compressionTypeProvider")
