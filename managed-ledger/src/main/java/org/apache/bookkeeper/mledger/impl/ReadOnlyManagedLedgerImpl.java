@@ -60,7 +60,8 @@ public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
                 }
 
                 // Last ledger stat may be zeroed, we must update it
-                if (ledgers.size() > 0 && ledgers.lastEntry().getValue().getEntries() == 0) {
+                if (ledgers.size() > 0 && (!ledgers.lastEntry().getValue().hasEntries()
+                        || ledgers.lastEntry().getValue().getEntries() == 0)) {
                     long lastLedgerId = ledgers.lastKey();
 
                     // Fetch last add confirmed for last ledger
@@ -122,7 +123,7 @@ public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
     ReadOnlyCursor createReadOnlyCursor(PositionImpl startPosition) {
         if (ledgers.isEmpty()) {
             lastConfirmedEntry = PositionImpl.EARLIEST;
-        } else if (ledgers.lastEntry().getValue().getEntries() > 0) {
+        } else if (ledgers.lastEntry().getValue().hasEntries() && ledgers.lastEntry().getValue().getEntries() > 0) {
             // Last ledger has some of the entries
             lastConfirmedEntry = new PositionImpl(ledgers.lastKey(), ledgers.lastEntry().getValue().getEntries() - 1);
         } else {
@@ -130,7 +131,7 @@ public class ReadOnlyManagedLedgerImpl extends ManagedLedgerImpl {
             if (ledgers.size() > 1) {
                 long lastLedgerId = ledgers.lastKey();
                 LedgerInfo li = ledgers.headMap(lastLedgerId, false).lastEntry().getValue();
-                lastConfirmedEntry = new PositionImpl(li.getLedgerId(), li.getEntries() - 1);
+                lastConfirmedEntry = new PositionImpl(li.getLedgerId(), li.hasEntries() ? li.getEntries() - 1 : -1);
             } else {
                 lastConfirmedEntry = PositionImpl.EARLIEST;
             }
