@@ -28,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.apache.bookkeeper.common.util.Recyclable;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteCursorCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.MarkDeleteCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenCursorCallback;
@@ -180,16 +182,19 @@ public class MessageDeduplication {
                 Position lastPosition = null;
                 for (Entry entry : entries) {
                     ByteBuf messageMetadataAndPayload = entry.getDataBuffer();
-                    MessageMetadata md = Commands.parseMessageMetadata(messageMetadataAndPayload);
-
-                    String producerName = md.getProducerName();
-                    long sequenceId = Math.max(md.getHighestSequenceId(), md.getSequenceId());
-                    highestSequencedPushed.put(producerName, sequenceId);
-                    highestSequencedPersisted.put(producerName, sequenceId);
-                    producerRemoved(producerName);
-                    snapshotCounter++;
-                    lastPosition = entry.getPosition();
-                    entry.release();
+                    try (Commands.RecyclableMessageMetadata rmd =
+                                 Commands.parseMessageMetadata(messageMetadataAndPayload)) {
+                        MessageMetadata md = rmd.getMetadata();
+                        String producerName = md.getProducerName();
+                        long sequenceId = Math.max(md.getHighestSequenceId(), md.getSequenceId());
+                        highestSequencedPushed.put(producerName, sequenceId);
+                        highestSequencedPersisted.put(producerName, sequenceId);
+                        producerRemoved(producerName);
+                        snapshotCounter++;
+                        lastPosition = entry.getPosition();
+                    } finally {
+                        entry.release();
+                    }
                 }
 
                 if (managedCursor.hasMoreEntries()) {
@@ -336,31 +341,40 @@ public class MessageDeduplication {
         String producerName = publishContext.getProducerName();
         long sequenceId = publishContext.getSequenceId();
         long highestSequenceId = Math.max(publishContext.getHighestSequenceId(), sequenceId);
-        MessageMetadata md = null;
-        if (producerName.startsWith(replicatorPrefix)) {
-            // Message is coming from replication, we need to use the original producer name and sequence id
-            // for the purpose of deduplication and not rely on the "replicator" name.
-            int readerIndex = headersAndPayload.readerIndex();
-            md = Commands.parseMessageMetadata(headersAndPayload);
-            producerName = md.getProducerName();
-            sequenceId = md.getSequenceId();
-            highestSequenceId = Math.max(md.getHighestSequenceId(), sequenceId);
-            publishContext.setOriginalProducerName(producerName);
-            publishContext.setOriginalSequenceId(sequenceId);
-            publishContext.setOriginalHighestSequenceId(highestSequenceId);
-            headersAndPayload.readerIndex(readerIndex);
-        }
+
         long chunkID = -1;
         long totalChunk = -1;
-        if (publishContext.isChunked()) {
-            if (md == null) {
+
+        Commands.RecyclableMessageMetadata md = null;
+        try {
+            if (producerName.startsWith(replicatorPrefix)) {
+                // Message is coming from replication, we need to use the original producer name and sequence id
+                // for the purpose of deduplication and not rely on the "replicator" name.
                 int readerIndex = headersAndPayload.readerIndex();
                 md = Commands.parseMessageMetadata(headersAndPayload);
+                producerName = md.getMetadata().getProducerName();
+                sequenceId = md.getMetadata().getSequenceId();
+                highestSequenceId = Math.max(md.getMetadata().getHighestSequenceId(), sequenceId);
+                publishContext.setOriginalProducerName(producerName);
+                publishContext.setOriginalSequenceId(sequenceId);
+                publishContext.setOriginalHighestSequenceId(highestSequenceId);
                 headersAndPayload.readerIndex(readerIndex);
             }
-            chunkID = md.getChunkId();
-            totalChunk = md.getNumChunksFromMsg();
+            if (publishContext.isChunked()) {
+                if (md == null) {
+                    int readerIndex = headersAndPayload.readerIndex();
+                    md = Commands.parseMessageMetadata(headersAndPayload);
+                    headersAndPayload.readerIndex(readerIndex);
+                }
+                chunkID = md.getMetadata().getChunkId();
+                totalChunk = md.getMetadata().getNumChunksFromMsg();
+            }
+        } finally {
+            if (md != null) {
+                md.recycle();
+            }
         }
+
         // All chunks of a message use the same message metadata and sequence ID,
         // so we only need to check the sequence ID for the last chunk in a chunk message.
         if (chunkID != -1 && chunkID != totalChunk - 1) {

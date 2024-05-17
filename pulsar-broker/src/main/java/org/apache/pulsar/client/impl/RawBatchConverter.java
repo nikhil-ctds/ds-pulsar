@@ -43,8 +43,9 @@ public class RawBatchConverter {
 
     public static boolean isReadableBatch(RawMessage msg) {
         ByteBuf payload = msg.getHeadersAndPayload();
-        MessageMetadata metadata = Commands.parseMessageMetadata(payload);
-        return isReadableBatch(metadata);
+        try (Commands.RecyclableMessageMetadata metadata = Commands.parseMessageMetadata(payload)) {
+            return isReadableBatch(metadata.getMetadata());
+        }
     }
 
     public static boolean isReadableBatch(MessageMetadata metadata) {
@@ -62,33 +63,34 @@ public class RawBatchConverter {
         checkArgument(msg.getMessageIdData().getBatchIndex() == -1);
 
         ByteBuf payload = msg.getHeadersAndPayload();
-        MessageMetadata metadata = Commands.parseMessageMetadata(payload);
-        int batchSize = metadata.getNumMessagesInBatch();
-
-        CompressionType compressionType = metadata.getCompression();
-        CompressionCodec codec = CompressionCodecProvider.getCompressionCodec(compressionType);
-        int uncompressedSize = metadata.getUncompressedSize();
-        ByteBuf uncompressedPayload = codec.decode(payload, uncompressedSize);
-
         List<ImmutableTriple<MessageId, String, Integer>> idsAndKeysAndSize = new ArrayList<>();
+        try (Commands.RecyclableMessageMetadata metadata = Commands.parseMessageMetadata(payload)) {
+            int batchSize = metadata.getMetadata().getNumMessagesInBatch();
 
-        SingleMessageMetadata smm = new SingleMessageMetadata();
-        for (int i = 0; i < batchSize; i++) {
-            ByteBuf singleMessagePayload = Commands.deSerializeSingleMessageInBatch(uncompressedPayload,
-                                                                                    smm,
-                                                                                    0, batchSize);
-            MessageId id = new BatchMessageIdImpl(msg.getMessageIdData().getLedgerId(),
-                                                  msg.getMessageIdData().getEntryId(),
-                                                  msg.getMessageIdData().getPartition(),
-                                                  i);
-            if (!smm.isCompactedOut() && (extractNullKey || smm.hasPartitionKey())) {
-                idsAndKeysAndSize.add(ImmutableTriple.of(id,
-                        smm.hasPartitionKey() ? smm.getPartitionKey() : null,
-                        smm.hasPayloadSize() ? smm.getPayloadSize() : 0));
+            CompressionType compressionType = metadata.getMetadata().getCompression();
+            CompressionCodec codec = CompressionCodecProvider.getCompressionCodec(compressionType);
+            int uncompressedSize = metadata.getMetadata().getUncompressedSize();
+            ByteBuf uncompressedPayload = codec.decode(payload, uncompressedSize);
+
+
+            SingleMessageMetadata smm = new SingleMessageMetadata();
+            for (int i = 0; i < batchSize; i++) {
+                ByteBuf singleMessagePayload = Commands.deSerializeSingleMessageInBatch(uncompressedPayload,
+                        smm,
+                        0, batchSize);
+                MessageId id = new BatchMessageIdImpl(msg.getMessageIdData().getLedgerId(),
+                        msg.getMessageIdData().getEntryId(),
+                        msg.getMessageIdData().getPartition(),
+                        i);
+                if (!smm.isCompactedOut() && (extractNullKey || smm.hasPartitionKey())) {
+                    idsAndKeysAndSize.add(ImmutableTriple.of(id,
+                            smm.hasPartitionKey() ? smm.getPartitionKey() : null,
+                            smm.hasPayloadSize() ? smm.getPayloadSize() : 0));
+                }
+                singleMessagePayload.release();
             }
-            singleMessagePayload.release();
+            uncompressedPayload.release();
         }
-        uncompressedPayload.release();
         return idsAndKeysAndSize;
     }
 
@@ -118,15 +120,18 @@ public class RawBatchConverter {
             payload.readerIndex(readerIndex);
             brokerMeta = payload.readSlice(brokerEntryMetadataSize + Short.BYTES + Integer.BYTES);
         }
-        MessageMetadata metadata = Commands.parseMessageMetadata(payload);
+
         ByteBuf batchBuffer = PulsarByteBufAllocator.DEFAULT.buffer(payload.capacity());
+        ByteBuf uncompressedPayload = null;
 
-        CompressionType compressionType = metadata.getCompression();
-        CompressionCodec codec = CompressionCodecProvider.getCompressionCodec(compressionType);
+        try (Commands.RecyclableMessageMetadata rmd = Commands.parseMessageMetadata(payload)) {
+            MessageMetadata metadata = rmd.getMetadata();
 
-        int uncompressedSize = metadata.getUncompressedSize();
-        ByteBuf uncompressedPayload = codec.decode(payload, uncompressedSize);
-        try {
+            CompressionType compressionType = metadata.getCompression();
+            CompressionCodec codec = CompressionCodecProvider.getCompressionCodec(compressionType);
+
+            int uncompressedSize = metadata.getUncompressedSize();
+            uncompressedPayload = codec.decode(payload, uncompressedSize);
             int batchSize = metadata.getNumMessagesInBatch();
             int messagesRetained = 0;
 
@@ -190,7 +195,9 @@ public class RawBatchConverter {
                 return Optional.empty();
             }
         } finally {
-            uncompressedPayload.release();
+            if (uncompressedPayload != null) {
+                uncompressedPayload.release();
+            }
             batchBuffer.release();
         }
     }

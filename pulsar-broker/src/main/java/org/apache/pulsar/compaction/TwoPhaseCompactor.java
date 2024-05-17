@@ -130,73 +130,76 @@ public class TwoPhaseCompactor extends Compactor {
                 boolean deletedMessage = false;
                 boolean replaceMessage = false;
                 mxBean.addCompactionReadOp(reader.getTopic(), m.getHeadersAndPayload().readableBytes());
-                MessageMetadata metadata = Commands.parseMessageMetadata(m.getHeadersAndPayload());
-                if (Markers.isServerOnlyMarker(metadata)) {
-                    mxBean.addCompactionRemovedEvent(reader.getTopic());
-                    deletedMessage = true;
-                } else if (RawBatchConverter.isReadableBatch(metadata)) {
-                    try {
-                        int numMessagesInBatch = metadata.getNumMessagesInBatch();
-                        int deleteCnt = 0;
-                        for (ImmutableTriple<MessageId, String, Integer> e : extractIdsAndKeysAndSizeFromBatch(m)) {
-                            if (e != null) {
-                                if (e.getMiddle() == null) {
-                                    if (!topicCompactionRetainNullKey) {
-                                        // record delete null-key message event
+                try (Commands.RecyclableMessageMetadata rmd =
+                             Commands.parseMessageMetadata(m.getHeadersAndPayload())) {
+                    MessageMetadata metadata = rmd.getMetadata();
+                    if (Markers.isServerOnlyMarker(metadata)) {
+                        mxBean.addCompactionRemovedEvent(reader.getTopic());
+                        deletedMessage = true;
+                    } else if (RawBatchConverter.isReadableBatch(metadata)) {
+                        try {
+                            int numMessagesInBatch = metadata.getNumMessagesInBatch();
+                            int deleteCnt = 0;
+                            for (ImmutableTriple<MessageId, String, Integer> e : extractIdsAndKeysAndSizeFromBatch(m)) {
+                                if (e != null) {
+                                    if (e.getMiddle() == null) {
+                                        if (!topicCompactionRetainNullKey) {
+                                            // record delete null-key message event
+                                            deleteCnt++;
+                                            mxBean.addCompactionRemovedEvent(reader.getTopic());
+                                        }
+                                        continue;
+                                    }
+                                    if (e.getRight() > 0) {
+                                        MessageId old = latestForKey.put(e.getMiddle(), e.getLeft());
+                                        if (old != null) {
+                                            mxBean.addCompactionRemovedEvent(reader.getTopic());
+                                        }
+                                    } else {
+                                        latestForKey.remove(e.getMiddle());
                                         deleteCnt++;
                                         mxBean.addCompactionRemovedEvent(reader.getTopic());
                                     }
-                                    continue;
-                                }
-                                if (e.getRight() > 0) {
-                                    MessageId old = latestForKey.put(e.getMiddle(), e.getLeft());
-                                    if (old != null) {
-                                        mxBean.addCompactionRemovedEvent(reader.getTopic());
-                                    }
-                                } else {
-                                    latestForKey.remove(e.getMiddle());
-                                    deleteCnt++;
-                                    mxBean.addCompactionRemovedEvent(reader.getTopic());
                                 }
                             }
-                        }
-                        if (deleteCnt == numMessagesInBatch) {
-                            deletedMessage = true;
-                        }
-                    } catch (IOException ioe) {
-                        log.info("Error decoding batch for message {}. Whole batch will be included in output",
-                                id, ioe);
-                    }
-                } else {
-                    Pair<String, Integer> keyAndSize = extractKeyAndSize(m);
-                    if (keyAndSize != null) {
-                        if (keyAndSize.getRight() > 0) {
-                            MessageId old = latestForKey.put(keyAndSize.getLeft(), id);
-                            replaceMessage = old != null;
-                        } else {
-                            deletedMessage = true;
-                            latestForKey.remove(keyAndSize.getLeft());
+                            if (deleteCnt == numMessagesInBatch) {
+                                deletedMessage = true;
+                            }
+                        } catch (IOException ioe) {
+                            log.info("Error decoding batch for message {}. Whole batch will be included in output",
+                                    id, ioe);
                         }
                     } else {
-                        if (!topicCompactionRetainNullKey) {
-                            deletedMessage = true;
+                        Pair<String, Integer> keyAndSize = extractKeyAndSize(m);
+                        if (keyAndSize != null) {
+                            if (keyAndSize.getRight() > 0) {
+                                MessageId old = latestForKey.put(keyAndSize.getLeft(), id);
+                                replaceMessage = old != null;
+                            } else {
+                                deletedMessage = true;
+                                latestForKey.remove(keyAndSize.getLeft());
+                            }
+                        } else {
+                            if (!topicCompactionRetainNullKey) {
+                                deletedMessage = true;
+                            }
+                        }
+                        if (replaceMessage || deletedMessage) {
+                            mxBean.addCompactionRemovedEvent(reader.getTopic());
                         }
                     }
-                    if (replaceMessage || deletedMessage) {
-                        mxBean.addCompactionRemovedEvent(reader.getTopic());
+                    MessageId first = firstMessageId.orElse(deletedMessage ? null : id);
+                    MessageId to = deletedMessage ? toMessageId.orElse(null) : id;
+                    if (id.compareTo(lastMessageId) == 0) {
+                        loopPromise.complete(new PhaseOneResult(first == null ? id : first, to == null ? id : to,
+                                lastMessageId, latestForKey));
+                    } else {
+                        phaseOneLoop(reader,
+                                Optional.ofNullable(first),
+                                Optional.ofNullable(to),
+                                lastMessageId,
+                                latestForKey, loopPromise);
                     }
-                }
-                MessageId first = firstMessageId.orElse(deletedMessage ? null : id);
-                MessageId to = deletedMessage ? toMessageId.orElse(null) : id;
-                if (id.compareTo(lastMessageId) == 0) {
-                    loopPromise.complete(new PhaseOneResult(first == null ? id : first, to == null ? id : to,
-                            lastMessageId, latestForKey));
-                } else {
-                    phaseOneLoop(reader,
-                            Optional.ofNullable(first),
-                            Optional.ofNullable(to),
-                            lastMessageId,
-                            latestForKey, loopPromise);
                 }
             }
         }, scheduler).exceptionally(ex -> {
@@ -266,75 +269,81 @@ public class TwoPhaseCompactor extends Compactor {
                 MessageId id = m.getMessageId();
                 Optional<RawMessage> messageToAdd = Optional.empty();
                 mxBean.addCompactionReadOp(reader.getTopic(), m.getHeadersAndPayload().readableBytes());
-                MessageMetadata metadata = Commands.parseMessageMetadata(m.getHeadersAndPayload());
-                if (Markers.isServerOnlyMarker(metadata)) {
-                    messageToAdd = Optional.empty();
-                } else if (RawBatchConverter.isReadableBatch(metadata)) {
-                    try {
-                        messageToAdd = rebatchMessage(reader.getTopic(),
-                                m, (key, subid) -> subid.equals(latestForKey.get(key)), topicCompactionRetainNullKey);
-                    } catch (IOException ioe) {
-                        log.info("Error decoding batch for message {}. Whole batch will be included in output",
-                                id, ioe);
-                        messageToAdd = Optional.of(m);
-                    }
-                } else {
-                    Pair<String, Integer> keyAndSize = extractKeyAndSize(m);
-                    MessageId msg;
-                    if (keyAndSize == null) {
-                        messageToAdd = topicCompactionRetainNullKey ? Optional.of(m) : Optional.empty();
-                    } else if ((msg = latestForKey.get(keyAndSize.getLeft())) != null
-                            && msg.equals(id)) { // consider message only if present into latestForKey map
-                        if (keyAndSize.getRight() <= 0) {
-                            promise.completeExceptionally(new IllegalArgumentException(
-                                    "Compaction phase found empty record from sorted key-map"));
-                        }
-                        messageToAdd = Optional.of(m);
-                    }
-                }
+                try (Commands.RecyclableMessageMetadata rmd =
+                             Commands.parseMessageMetadata(m.getHeadersAndPayload())) {
 
-                if (messageToAdd.isPresent()) {
-                    RawMessage message = messageToAdd.get();
-                    try {
-                        outstanding.acquire();
-                        CompletableFuture<Void> addFuture = addToCompactedLedger(lh, message, reader.getTopic())
-                                .whenComplete((res, exception2) -> {
-                                    outstanding.release();
-                                    if (exception2 != null) {
-                                        promise.completeExceptionally(exception2);
+                    MessageMetadata metadata = rmd.getMetadata();
+
+                    if (Markers.isServerOnlyMarker(metadata)) {
+                        messageToAdd = Optional.empty();
+                    } else if (RawBatchConverter.isReadableBatch(metadata)) {
+                        try {
+                            messageToAdd = rebatchMessage(reader.getTopic(),
+                                    m, (key, subid) -> subid.equals(latestForKey.get(key)),
+                                    topicCompactionRetainNullKey);
+                        } catch (IOException ioe) {
+                            log.info("Error decoding batch for message {}. Whole batch will be included in output",
+                                    id, ioe);
+                            messageToAdd = Optional.of(m);
+                        }
+                    } else {
+                        Pair<String, Integer> keyAndSize = extractKeyAndSize(m);
+                        MessageId msg;
+                        if (keyAndSize == null) {
+                            messageToAdd = topicCompactionRetainNullKey ? Optional.of(m) : Optional.empty();
+                        } else if ((msg = latestForKey.get(keyAndSize.getLeft())) != null
+                                && msg.equals(id)) { // consider message only if present into latestForKey map
+                            if (keyAndSize.getRight() <= 0) {
+                                promise.completeExceptionally(new IllegalArgumentException(
+                                        "Compaction phase found empty record from sorted key-map"));
+                            }
+                            messageToAdd = Optional.of(m);
+                        }
+                    }
+
+                    if (messageToAdd.isPresent()) {
+                        RawMessage message = messageToAdd.get();
+                        try {
+                            outstanding.acquire();
+                            CompletableFuture<Void> addFuture = addToCompactedLedger(lh, message, reader.getTopic())
+                                    .whenComplete((res, exception2) -> {
+                                        outstanding.release();
+                                        if (exception2 != null) {
+                                            promise.completeExceptionally(exception2);
+                                        }
+                                    });
+                            if (to.equals(id)) {
+                                // make sure all inflight writes have finished
+                                outstanding.acquire(MAX_OUTSTANDING);
+                                addFuture.whenComplete((res, exception2) -> {
+                                    if (exception2 == null) {
+                                        promise.complete(null);
                                     }
                                 });
-                        if (to.equals(id)) {
+                            }
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            promise.completeExceptionally(ie);
+                        } finally {
+                            if (message != m) {
+                                message.close();
+                            }
+                        }
+                    } else if (to.equals(id)) {
+                        // Reached to last-id and phase-one found it deleted-message while iterating on ledger so,
+                        // not present under latestForKey. Complete the compaction.
+                        try {
                             // make sure all inflight writes have finished
                             outstanding.acquire(MAX_OUTSTANDING);
-                            addFuture.whenComplete((res, exception2) -> {
-                                if (exception2 == null) {
-                                    promise.complete(null);
-                                }
-                            });
+                            promise.complete(null);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            promise.completeExceptionally(e);
                         }
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        promise.completeExceptionally(ie);
-                    } finally {
-                        if (message != m) {
-                            message.close();
-                        }
+                        return;
                     }
-                } else if (to.equals(id)) {
-                    // Reached to last-id and phase-one found it deleted-message while iterating on ledger so,
-                    // not present under latestForKey. Complete the compaction.
-                    try {
-                        // make sure all inflight writes have finished
-                        outstanding.acquire(MAX_OUTSTANDING);
-                        promise.complete(null);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        promise.completeExceptionally(e);
-                    }
-                    return;
+                    phaseTwoLoop(reader, to, latestForKey, lh, outstanding, promise, m.getMessageId());
                 }
-                phaseTwoLoop(reader, to, latestForKey, lh, outstanding, promise, m.getMessageId());
             } finally {
                 m.close();
             }
@@ -423,15 +432,16 @@ public class TwoPhaseCompactor extends Compactor {
 
     protected Pair<String, Integer> extractKeyAndSize(RawMessage m) {
         ByteBuf headersAndPayload = m.getHeadersAndPayload();
-        MessageMetadata msgMetadata = Commands.parseMessageMetadata(headersAndPayload);
-        if (msgMetadata.hasPartitionKey()) {
-            int size = headersAndPayload.readableBytes();
-            if (msgMetadata.hasUncompressedSize()) {
-                size = msgMetadata.getUncompressedSize();
+        try (Commands.RecyclableMessageMetadata msgMetadata = Commands.parseMessageMetadata(headersAndPayload)) {
+            if (msgMetadata.getMetadata().hasPartitionKey()) {
+                int size = headersAndPayload.readableBytes();
+                if (msgMetadata.getMetadata().hasUncompressedSize()) {
+                    size = msgMetadata.getMetadata().getUncompressedSize();
+                }
+                return Pair.of(msgMetadata.getMetadata().getPartitionKey(), size);
+            } else {
+                return null;
             }
-            return Pair.of(msgMetadata.getPartitionKey(), size);
-        } else {
-            return null;
         }
     }
 

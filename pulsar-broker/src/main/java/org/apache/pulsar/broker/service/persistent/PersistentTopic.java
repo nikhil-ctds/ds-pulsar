@@ -3227,14 +3227,16 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
             @Override
             public void readEntryComplete(Entry entry, Object ctx) {
                 try {
-                    MessageMetadata metadata = Commands.parseMessageMetadata(entry.getDataBuffer());
-                    if (metadata.hasNumMessagesInBatch()) {
-                        completableFuture.complete(new BatchMessageIdImpl(position.getLedgerId(), position.getEntryId(),
-                                partitionIndex, metadata.getNumMessagesInBatch() - 1));
-                    } else {
-                        completableFuture
-                                .complete(new MessageIdImpl(position.getLedgerId(), position.getEntryId(),
-                                        partitionIndex));
+                    try (Commands.RecyclableMessageMetadata metadata =
+                                 Commands.parseMessageMetadata(entry.getDataBuffer())) {
+                        if (metadata.getMetadata().hasNumMessagesInBatch()) {
+                            completableFuture.complete(new BatchMessageIdImpl(position.getLedgerId(), position.getEntryId(),
+                                    partitionIndex, metadata.getMetadata().getNumMessagesInBatch() - 1));
+                        } else {
+                            completableFuture
+                                    .complete(new MessageIdImpl(position.getLedgerId(), position.getEntryId(),
+                                            partitionIndex));
+                        }
                     }
                 } finally {
                     entry.release();

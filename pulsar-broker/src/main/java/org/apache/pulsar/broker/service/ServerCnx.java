@@ -1770,17 +1770,19 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
     }
 
     private void printSendCommandDebug(CommandSend send, ByteBuf headersAndPayload) {
-        headersAndPayload.markReaderIndex();
-        MessageMetadata msgMetadata = Commands.parseMessageMetadata(headersAndPayload);
-        headersAndPayload.resetReaderIndex();
         if (log.isDebugEnabled()) {
-            log.debug("[{}] Received send message request. producer: {}:{} {}:{} size: {},"
-                            + " partition key is: {}, ordering key is {}, uncompressedSize is {}",
-                    remoteAddress, send.getProducerId(), send.getSequenceId(), msgMetadata.getProducerName(),
-                    msgMetadata.getSequenceId(), headersAndPayload.readableBytes(),
-                    msgMetadata.hasPartitionKey() ? msgMetadata.getPartitionKey() : null,
-                    msgMetadata.hasOrderingKey() ? msgMetadata.getOrderingKey() : null,
-                    msgMetadata.getUncompressedSize());
+            headersAndPayload.markReaderIndex();
+            try (Commands.RecyclableMessageMetadata md = Commands.parseMessageMetadata(headersAndPayload)) {
+                MessageMetadata msgMetadata = md.getMetadata();
+                headersAndPayload.resetReaderIndex();
+                log.debug("[{}] Received send message request. producer: {}:{} {}:{} size: {},"
+                                + " partition key is: {}, ordering key is {}, uncompressedSize is {}",
+                        remoteAddress, send.getProducerId(), send.getSequenceId(), msgMetadata.getProducerName(),
+                        msgMetadata.getSequenceId(), headersAndPayload.readableBytes(),
+                        msgMetadata.hasPartitionKey() ? msgMetadata.getPartitionKey() : null,
+                        msgMetadata.hasOrderingKey() ? msgMetadata.getOrderingKey() : null,
+                        msgMetadata.getUncompressedSize());
+            }
         }
     }
 
@@ -2163,10 +2165,12 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
             }, null);
 
             CompletableFuture<Integer> batchSizeFuture = entryFuture.thenApply(entry -> {
-                MessageMetadata metadata = Commands.parseMessageMetadata(entry.getDataBuffer());
-                int batchSize = metadata.getNumMessagesInBatch();
-                entry.release();
-                return metadata.hasNumMessagesInBatch() ? batchSize : -1;
+                try (Commands.RecyclableMessageMetadata metadata =
+                             Commands.parseMessageMetadata(entry.getDataBuffer())) {
+                    int batchSize = metadata.getMetadata().getNumMessagesInBatch();
+                    entry.release();
+                    return metadata.getMetadata().hasNumMessagesInBatch() ? batchSize : -1;
+                }
             });
 
             batchSizeFuture.whenComplete((batchSize, e) -> {

@@ -144,10 +144,9 @@ public class RawReaderImpl implements RawReader {
                 assert(messageAndCnx == null);
             } else {
                 int numMsg;
-                try {
-                    MessageMetadata msgMetadata =
-                            Commands.parseMessageMetadata(messageAndCnx.msg.getHeadersAndPayload());
-                    numMsg = msgMetadata.getNumMessagesInBatch();
+                try (Commands.RecyclableMessageMetadata msgMetadata =
+                            Commands.parseMessageMetadata(messageAndCnx.msg.getHeadersAndPayload())) {
+                    numMsg = msgMetadata.getMetadata().getNumMessagesInBatch();
                 } catch (Throwable t) {
                     // TODO message validation
                     numMsg = 1;

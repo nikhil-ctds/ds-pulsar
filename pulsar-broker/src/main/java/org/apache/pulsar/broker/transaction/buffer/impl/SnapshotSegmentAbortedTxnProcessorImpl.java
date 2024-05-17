@@ -492,7 +492,8 @@ public class SnapshotSegmentAbortedTxnProcessorImpl implements AbortedTxnProcess
         //decode snapshot from entry
         ByteBuf headersAndPayload = entry.getDataBuffer();
         //skip metadata
-        Commands.parseMessageMetadata(headersAndPayload);
+        Commands.parseMessageMetadata(headersAndPayload)
+                .recycle();
         TransactionBufferSnapshotSegment snapshotSegment = Schema.AVRO(TransactionBufferSnapshotSegment.class)
                 .decode(Unpooled.wrappedBuffer(headersAndPayload).nioBuffer());
 

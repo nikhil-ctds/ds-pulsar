@@ -26,6 +26,7 @@ import com.google.common.base.Strings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.Recycler;
 import io.netty.util.concurrent.FastThreadLocal;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import lombok.Getter;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -152,13 +155,35 @@ public class Commands {
                 }
             };
 
-    private static final FastThreadLocal<MessageMetadata> LOCAL_MESSAGE_METADATA = //
-            new FastThreadLocal<MessageMetadata>() {
-                @Override
-                protected MessageMetadata initialValue() throws Exception {
-                    return new MessageMetadata();
-                }
-            };
+    public static class RecyclableMessageMetadata implements AutoCloseable {
+        @Getter
+        private MessageMetadata metadata;
+        private Recycler.Handle<RecyclableMessageMetadata> handle;
+
+        public RecyclableMessageMetadata(Recycler.Handle<RecyclableMessageMetadata> handle) {
+            this.handle = handle;
+            this.metadata = new MessageMetadata();
+        }
+
+        public void recycle() {
+            metadata.clear();
+            if (handle != null) {
+                handle.recycle(this);
+            }
+        }
+
+        @Override
+        public void close() {
+            recycle();
+        }
+    }
+
+    private static final Recycler<RecyclableMessageMetadata> LOCAL_MESSAGE_METADATA_RECYCLER = new Recycler<RecyclableMessageMetadata>() {
+        @Override
+        protected RecyclableMessageMetadata newObject(Handle<RecyclableMessageMetadata> handle) {
+            return new RecyclableMessageMetadata(handle);
+        }
+    };
 
     private static final FastThreadLocal<BrokerEntryMetadata> BROKER_ENTRY_METADATA = //
             new FastThreadLocal<BrokerEntryMetadata>() {
@@ -440,9 +465,9 @@ public class Commands {
         }
     }
 
-    public static MessageMetadata parseMessageMetadata(ByteBuf buffer) {
-        MessageMetadata md = LOCAL_MESSAGE_METADATA.get();
-        parseMessageMetadata(buffer, md);
+    public static RecyclableMessageMetadata parseMessageMetadata(ByteBuf buffer) {
+        RecyclableMessageMetadata md = LOCAL_MESSAGE_METADATA_RECYCLER.get();
+        parseMessageMetadata(buffer, md.getMetadata());
         return md;
     }
 
@@ -475,7 +500,9 @@ public class Commands {
             return brokerEntryMetadata.getBrokerTimestamp();
         }
         // otherwise get the publish_time
-        return parseMessageMetadata(headersAndPayloadWithBrokerEntryMetadata).getPublishTime();
+        try(RecyclableMessageMetadata rmd = parseMessageMetadata(headersAndPayloadWithBrokerEntryMetadata)) {
+            return rmd.getMetadata().getPublishTime();
+        }
     }
 
     public static BaseCommand newMessageCommand(long consumerId, long ledgerId, long entryId, int partition,
