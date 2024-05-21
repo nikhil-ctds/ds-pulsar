@@ -24,6 +24,7 @@ on:
       - master
       - 3.1_ds
       - 3.1_fx_merged_ci
+      - 3.1_fx_merged
   schedule:
     - cron: '0 12 * * *'
   workflow_dispatch:
