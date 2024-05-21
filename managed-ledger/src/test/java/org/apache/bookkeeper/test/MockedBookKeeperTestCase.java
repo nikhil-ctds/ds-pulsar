@@ -66,6 +66,10 @@ public abstract class MockedBookKeeperTestCase {
         this.numBookies = numBookies;
     }
 
+    protected void setupManagedLedgerFactoryConfig(ManagedLedgerFactoryConfig config) {
+        // No-op
+    }
+
     @BeforeMethod(alwaysRun = true)
     public final void setUp(Method method) throws Exception {
         LOG.info(">>>>>> starting {}", method);
@@ -83,7 +87,7 @@ public abstract class MockedBookKeeperTestCase {
         ManagedLedgerFactoryConfig managedLedgerFactoryConfig = new ManagedLedgerFactoryConfig();
         // increase default cache eviction interval so that caching could be tested with less flakyness
         managedLedgerFactoryConfig.setCacheEvictionIntervalMs(200);
-        managedLedgerFactoryConfig.setManagedCursorInfoCompressionType("LZ4");
+        setupManagedLedgerFactoryConfig(managedLedgerFactoryConfig);
         factory = new ManagedLedgerFactoryImpl(metadataStore, bkc, managedLedgerFactoryConfig);
 
         setUpTestCase();

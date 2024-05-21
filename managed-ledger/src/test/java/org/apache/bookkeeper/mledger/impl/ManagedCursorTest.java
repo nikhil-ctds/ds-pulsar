@@ -127,6 +127,11 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
         return new Object[][] { { Boolean.TRUE }, { Boolean.FALSE } };
     }
 
+    @Override
+    protected void setupManagedLedgerFactoryConfig(ManagedLedgerFactoryConfig config) {
+        super.setupManagedLedgerFactoryConfig(config);
+        config.setManagedCursorInfoCompressionType("LZ4");
+    }
 
     @Test
     public void testCloseCursor() throws Exception {
