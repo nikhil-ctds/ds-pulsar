@@ -3410,6 +3410,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         }
 
         try {
+            log.info("Original data {}", ByteBufUtil.prettyHexDump(data));
             int uncompressedSize = data.readableBytes();
             String pulsarCursorInfoCompressionString = new String(pulsarCursorInfoCompression);
             CompressionCodec compressionCodec = CompressionCodecProvider.getCompressionCodec(
@@ -3429,35 +3430,44 @@ public class ManagedCursorImpl implements ManagedCursor {
             int ratio = (int) (compressedSize * 100.0 / uncompressedSize);
             log.info("[{}] Cursor {} Compressed data size {} bytes (with {}, original size {} bytes, ratio {}%)",
                     ledger.getName(), name, compressedSize, pulsarCursorInfoCompressionString, uncompressedSize, ratio);
+            log.info("Compressed data {}, full {}", ByteBufUtil.prettyHexDump(encode), ByteBufUtil.prettyHexDump(result));
             return result;
         } finally {
             data.release();
         }
     }
 
-    private static byte[] decompressDataIfNeeded(byte[] data, LedgerHandle lh) {
+    private byte[] decompressDataIfNeeded(byte[] data, LedgerHandle lh) {
         byte[] pulsarCursorInfoCompression =
                 lh.getCustomMetadata().get(METADATA_PROPERTY_CURSOR_COMPRESSION_TYPE);
         if (pulsarCursorInfoCompression != null) {
             String pulsarCursorInfoCompressionString = new String(pulsarCursorInfoCompression);
+            log.info("Ledger {} compression {} decompressing {} bytes, full {}",
+                    lh.getId(), pulsarCursorInfoCompressionString, data.length, ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(data)));
             ByteArrayInputStream input = new ByteArrayInputStream(data);
             DataInputStream dataInputStream = new DataInputStream(input);
             try {
                 int uncompressedSize = dataInputStream.readInt();
-                byte[] compressedData = dataInputStream.readNBytes(uncompressedSize);
+                byte[] compressedData = dataInputStream.readAllBytes();
+                log.info("Data to decompress uncompressedSize {}: {}", uncompressedSize, ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(compressedData)));
+
                 CompressionCodec compressionCodec = CompressionCodecProvider.getCompressionCodec(
                         CompressionType.valueOf(pulsarCursorInfoCompressionString), uncompressedSize);
                 ByteBuf decode = compressionCodec.decode(Unpooled.wrappedBuffer(compressedData), uncompressedSize);
                 try {
-                    return ByteBufUtil.getBytes(decode);
+                    byte[] result =  ByteBufUtil.getBytes(decode);
+                    log.info("Decompressed data {}", ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(result)));
+                    if (result.length != uncompressedSize) {
+                        throw new IOException("Short read "+uncompressedSize+" <> " +result.length);
+                    }
+                    return result;
                 } finally {
                     decode.release();
                 }
-            } catch (IOException error) {
+            } catch (IOException | MalformedInputException error) {
+                log.error("[{}] Cursor {} Cannot decompress cursor position. Payload is {}",
+                        ledger.getName(), name, ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(data)));
                 throw new RuntimeException(error);
-            } catch (MalformedInputException notReallyCompressed) {
-                log.info("Data doesn't seem compressed {}, returning as it is", notReallyCompressed + "");
-                return data;
             }
         }
 

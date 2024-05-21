@@ -83,7 +83,8 @@ public abstract class MockedBookKeeperTestCase {
         ManagedLedgerFactoryConfig managedLedgerFactoryConfig = new ManagedLedgerFactoryConfig();
         // increase default cache eviction interval so that caching could be tested with less flakyness
         managedLedgerFactoryConfig.setCacheEvictionIntervalMs(200);
-        factory = new ManagedLedgerFactoryImpl(metadataStore, bkc);
+        managedLedgerFactoryConfig.setManagedCursorInfoCompressionType("LZ4");
+        factory = new ManagedLedgerFactoryImpl(metadataStore, bkc, managedLedgerFactoryConfig);
 
         setUpTestCase();
     }
