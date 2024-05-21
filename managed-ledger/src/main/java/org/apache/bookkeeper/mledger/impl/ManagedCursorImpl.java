@@ -3435,7 +3435,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         }
     }
 
-    private byte[] decompressDataIfNeeded(byte[] data, LedgerHandle lh) {
+    static byte[] decompressDataIfNeeded(byte[] data, LedgerHandle lh) {
         byte[] pulsarCursorInfoCompression =
                 lh.getCustomMetadata().get(METADATA_PROPERTY_CURSOR_COMPRESSION_TYPE);
         if (pulsarCursorInfoCompression != null) {
@@ -3459,8 +3459,9 @@ public class ManagedCursorImpl implements ManagedCursor {
                     decode.release();
                 }
             } catch (IOException | MalformedInputException error) {
-                log.error("[{}] Cursor {} Cannot decompress cursor position. Payload is {}",
-                        ledger.getName(), name, ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(data)));
+                log.error("Cannot decompress cursor position using {}. Payload is {}",
+                        pulsarCursorInfoCompressionString,
+                        ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(data)), error);
                 throw new RuntimeException(error);
             }
         }

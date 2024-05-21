@@ -3231,7 +3231,9 @@ public class ManagedCursorTest extends MockedBookKeeperTestCase {
                     try {
                         LedgerEntry entry = seq.nextElement();
                         PositionInfo positionInfo;
-                        positionInfo = PositionInfo.parseFrom(entry.getEntry());
+                        byte[] data = entry.getEntry();
+                        data = ManagedCursorImpl.decompressDataIfNeeded(data, lh);
+                        positionInfo = PositionInfo.parseFrom(data);
                         individualDeletedMessagesCount.set(positionInfo.getIndividualDeletedMessagesCount());
                     } catch (Exception e) {
                     }
