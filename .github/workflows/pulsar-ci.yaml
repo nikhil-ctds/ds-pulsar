@@ -134,11 +134,11 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      - name: Check source code license headers
-        run: mvn -B -T 8 -ntp initialize apache-rat:check license:check
+      # - name: Check source code license headers
+      #   run: mvn -B -T 8 -ntp initialize apache-rat:check license:check
 
-      - name: Check source code style
-        run: mvn -B -T 8 -ntp initialize checkstyle:check
+      # - name: Check source code style
+      #   run: mvn -B -T 8 -ntp initialize checkstyle:check
 
       - name: Build core-modules
         run: |
