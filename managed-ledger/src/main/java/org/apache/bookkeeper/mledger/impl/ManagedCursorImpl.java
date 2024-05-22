@@ -3321,7 +3321,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         if (numParts == 1) {
             // no need for chunking
             // asyncAddEntry will release data ByteBuf
-            writeToBookKeeperLastChunk(lh, mdEntry, callback, data, position, () -> {});
+            writeToBookKeeperLastChunk(lh, mdEntry, callback, data, len, position, () -> {});
         } else {
             // chunking
             int part = 0;
@@ -3357,7 +3357,7 @@ public class ManagedCursorImpl implements ManagedCursor {
                     }
                     // need to explicitly release data ByteBuf
                     writeToBookKeeperLastChunk(lh, mdEntry, callback,
-                            Unpooled.wrappedBuffer(footerData), position, data::release);
+                            Unpooled.wrappedBuffer(footerData), len, position, data::release);
                 }
                 offset += currentLen;
                 part++;
@@ -3370,6 +3370,7 @@ public class ManagedCursorImpl implements ManagedCursor {
                                             MarkDeleteEntry mdEntry,
                                             VoidCallback callback,
                                             ByteBuf data,
+                                            int totalLength,
                                             PositionImpl position,
                                             Runnable onFinished) {
         lh.asyncAddEntry(data, (rc, lh1, entryId, ctx) -> {
@@ -3384,7 +3385,7 @@ public class ManagedCursorImpl implements ManagedCursor {
                     rolloverLedgerIfNeeded(lh1);
 
                     mbean.persistToLedger(true);
-                    mbean.addWriteCursorLedgerSize(data.readableBytes());
+                    mbean.addWriteCursorLedgerSize(totalLength);
                     callback.operationComplete();
                 } else {
                     log.warn("[{}] Error updating cursor {} position {} in meta-ledger {}: {}", ledger.getName(), name,
