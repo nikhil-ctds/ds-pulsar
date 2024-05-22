@@ -305,7 +305,7 @@ ci_snapshot_pulsar_maven_artifacts() {
     fail "This script can only be run in GitHub Actions"
   fi
   mkdir -p target
-  find $HOME/.m2/repository/org/apache/pulsar -name "*.jar" > /tmp/provided_pulsar_maven_artifacts
+  find $HOME/.m2/repository/com/datastax/oss/pulsar -name "*.jar" > /tmp/provided_pulsar_maven_artifacts
   )
 }
 

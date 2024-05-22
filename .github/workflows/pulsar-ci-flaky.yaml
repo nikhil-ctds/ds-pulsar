@@ -120,7 +120,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
