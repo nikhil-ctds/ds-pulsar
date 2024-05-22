@@ -123,7 +123,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
@@ -154,8 +154,8 @@ jobs:
         run: |
           cd $HOME
           $GITHUB_WORKSPACE/build/pulsar_ci_tool.sh store_tar_to_github_actions_artifacts pulsar-maven-repository-binaries \
-          tar --exclude '.m2/repository/org/apache/pulsar/pulsar-*-distribution' \
-              -I zstd -cf - .m2/repository/org/apache/pulsar
+          tar --exclude '.m2/repository/com/datastax/oss/pulsar/pulsar-*-distribution' \
+              -I zstd -cf - .m2/repository/com/datastax/oss/pulsar
           cd $GITHUB_WORKSPACE
           $GITHUB_WORKSPACE/build/pulsar_ci_tool.sh store_tar_to_github_actions_artifacts pulsar-server-distribution \
           tar -I zstd -cf - distribution/server/target/apache-pulsar-*-bin.tar.gz
@@ -231,7 +231,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
@@ -335,7 +335,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
@@ -415,7 +415,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
@@ -530,7 +530,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
@@ -646,7 +646,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
@@ -760,7 +760,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-all-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
@@ -898,7 +898,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-all-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
@@ -1009,7 +1009,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-all-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
@@ -1111,7 +1111,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-all-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
@@ -1230,7 +1230,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-all-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-all-
@@ -1273,7 +1273,7 @@ jobs:
         with:
           path: |
             ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/pulsar
+            !~/.m2/repository/com/datastax/oss/pulsar
           key: ${{ runner.os }}-m2-dependencies-core-modules-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2-dependencies-core-modules-
