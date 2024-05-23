@@ -139,7 +139,6 @@ public class NamespaceEventsSystemTopicServiceTest extends MockedPulsarServiceBa
                 }
                 List<EntryFilter> filters3 = brokerService.getEntryFilterProvider().loadEntryFilters(List.of("jms"));
                 // don't use it, just load
-                filters3.get(0).close();
 
                 //brokerService.getEntryFilterProvider().close();
                 for (int j = 0; j < 10; j++) {
@@ -149,6 +148,9 @@ public class NamespaceEventsSystemTopicServiceTest extends MockedPulsarServiceBa
                 }
 
                 List<EntryFilter> filters4 = brokerService.getEntryFilterProvider().loadEntryFilters(List.of("jms"));
+
+                filters3.get(0).close();
+
                 filters4.get(0).filterEntry(entry, filterContext);
                 filters4.get(0).close();
             }
