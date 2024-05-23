@@ -122,28 +122,41 @@ public class NamespaceEventsSystemTopicServiceTest extends MockedPulsarServiceBa
         MessageMetadata meta = mock(org.apache.pulsar.common.api.proto.MessageMetadata.class);
         filterContext.setMsgMetadata(meta);
         Entry entry = EntryImpl.create(1, 1, "test".getBytes());
+        List<EntryFilter> filters0 = brokerService.getEntryFilterProvider().loadEntryFilters(List.of("jms"));
         try
         {
-            for (int i = 0; i < 1; i++) {
+            for (int i = 0; i < 10; i++) {
                 if (!filters.isEmpty()) {
                     filters.get(0).filterEntry(entry, filterContext);
                 }
 
+                filters0.get(0).filterEntry(entry, filterContext);
+
                 {
                     List<EntryFilter> filters2 = brokerService.getEntryFilterProvider().loadEntryFilters(List.of("jms"));
                     filters2.get(0).filterEntry(entry, filterContext);
+                    filters2.get(0).close();
                 }
+                List<EntryFilter> filters3 = brokerService.getEntryFilterProvider().loadEntryFilters(List.of("jms"));
+                // don't use it, just load
+                filters3.get(0).close();
+
                 //brokerService.getEntryFilterProvider().close();
                 for (int j = 0; j < 10; j++) {
                     System.gc();
                     System.runFinalization();
-                    Thread.sleep(3000);
+                    Thread.sleep(1000);
                 }
 
                 List<EntryFilter> filters4 = brokerService.getEntryFilterProvider().loadEntryFilters(List.of("jms"));
                 filters4.get(0).filterEntry(entry, filterContext);
+                filters4.get(0).close();
             }
         } finally {
+            filters0.get(0).close();
+            if (!filters.isEmpty()) {
+                filters.get(0).close();
+            }
             entry.release();
         }
     }
