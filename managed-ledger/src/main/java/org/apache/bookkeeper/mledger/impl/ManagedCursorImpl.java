@@ -29,6 +29,7 @@ import static org.apache.bookkeeper.mledger.util.Errors.isNoSuchLedgerExistsExce
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Range;
@@ -247,6 +248,8 @@ public class ManagedCursorImpl implements ManagedCursor {
 
     // active state cache in ManagedCursor. It should be in sync with the state in activeCursors in ManagedLedger.
     private volatile boolean isActive = false;
+
+    protected int maxPositionChunkSize = 1024 * 1024;
 
     static class MarkDeleteEntry {
         final PositionImpl newPosition;
@@ -3305,6 +3308,7 @@ public class ManagedCursorImpl implements ManagedCursor {
     }
 
     void persistPositionToLedger(final LedgerHandle lh, MarkDeleteEntry mdEntry, final VoidCallback callback) {
+        Preconditions.checkArgument(maxPositionChunkSize > 0, "maxPositionChunkSize mus be greater than zero");
         long now = System.nanoTime();
         PositionImpl position = mdEntry.newPosition;
 
@@ -3325,10 +3329,9 @@ public class ManagedCursorImpl implements ManagedCursor {
 
         long endCompress = System.nanoTime();
 
-        int maxSize = 1024 * 1024;
         int offset = 0;
         final int len = data.readableBytes();
-        int numParts = 1 + (len / maxSize);
+        int numParts = 1 + (len / maxPositionChunkSize);
 
         if (log.isDebugEnabled()) {
             log.debug("[{}] Cursor {} Appending to ledger={} position={} data size {} bytes, numParts {}",
@@ -3351,7 +3354,7 @@ public class ManagedCursorImpl implements ManagedCursor {
             int part = 0;
             while (part != numParts) {
                 int remaining = len - offset;
-                int currentLen = Math.min(maxSize, remaining);
+                int currentLen = Math.min(maxPositionChunkSize, remaining);
                 boolean isLast = part == numParts - 1;
 
                 if (log.isDebugEnabled()) {
