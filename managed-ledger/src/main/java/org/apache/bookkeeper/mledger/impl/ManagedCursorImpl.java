@@ -581,48 +581,9 @@ public class ManagedCursorImpl implements ManagedCursor {
 
             // Read the last entry in the ledger
             long lastEntryInLedger = lh.getLastAddConfirmed();
-
-            if (lastEntryInLedger < 0) {
-                log.warn("[{}] Error reading from metadata ledger {} for cursor {}: No entries in ledger",
-                        ledger.getName(), ledgerId, name);
-                // Rewind to last cursor snapshot available
-                initialize(getRollbackPosition(info), Collections.emptyMap(), cursorProperties, callback);
-                return;
-            }
-
-            lh.asyncReadEntries(lastEntryInLedger, lastEntryInLedger, (rc1, lh1, seq, ctx1) -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("[{}} readComplete rc={} entryId={}", ledger.getName(), rc1, lh1.getLastAddConfirmed());
-                }
-                if (isBkErrorNotRecoverable(rc1)) {
-                    log.error("[{}] Error reading from metadata ledger {} for cursor {}: {}", ledger.getName(),
-                            ledgerId, name, BKException.getMessage(rc1));
-                    // Rewind to oldest entry available
-                    initialize(getRollbackPosition(info), Collections.emptyMap(), cursorProperties, callback);
-                    return;
-                } else if (rc1 != BKException.Code.OK) {
-                    log.warn("[{}] Error reading from metadata ledger {} for cursor {}: {}", ledger.getName(),
-                            ledgerId, name, BKException.getMessage(rc1));
-
-                    callback.operationFailed(createManagedLedgerException(rc1));
-                    return;
-                }
-
-                LedgerEntry entry = seq.nextElement();
-                byte[] data = entry.getEntry();
-                try {
-                    ChunkSequenceFooter chunkSequenceFooter = parseChunkSequenceFooter(data);
-                    if (chunkSequenceFooter.numParts > 0) {
-                        readChunkSequence(callback, lh, lastEntryInLedger, chunkSequenceFooter);
-                    } else {
-                        completeCursorRecovery(callback, lh, data);
-                    }
-                    } catch (IOException error) {
-                        log.error("Cannot parse footer", error);
-                        callback.operationFailed(ManagedLedgerException.getManagedLedgerException(error));
-                    }
-            }, null);
+            recoverFromLedgerByEntryId(info, callback, lh, lastEntryInLedger);
         };
+
         try {
             bookkeeper.asyncOpenLedger(ledgerId, digestType, config.getPassword(), openCallback, null);
         } catch (Throwable t) {
@@ -630,6 +591,66 @@ public class ManagedCursorImpl implements ManagedCursor {
                 ledger.getName(), ledgerId, name, t);
             openCallback.openComplete(BKException.Code.UnexpectedConditionException, null, null);
         }
+    }
+
+    private void recoverFromLedgerByEntryId(ManagedCursorInfo info,
+                                            VoidCallback callback,
+                                            LedgerHandle lh,
+                                            long entryId) {
+        long ledgerId = lh.getId();
+
+        if (entryId < 0) {
+            log.warn("[{}] Error reading from metadata ledger {} for cursor {}: No entries in ledger",
+                    ledger.getName(), ledgerId, name);
+            // Rewind to last cursor snapshot available
+            initialize(getRollbackPosition(info), Collections.emptyMap(), cursorProperties, callback);
+            return;
+        }
+
+        lh.asyncReadEntries(entryId, entryId, (rc1, lh1, seq, ctx1) -> {
+            if (log.isDebugEnabled()) {
+                log.debug("[{}} readComplete rc={} entryId={}", ledger.getName(), rc1, lh1.getLastAddConfirmed());
+            }
+            if (isBkErrorNotRecoverable(rc1)) {
+                log.error("[{}] Error reading from metadata ledger {} for cursor {}: {}", ledger.getName(),
+                        ledgerId, name, BKException.getMessage(rc1));
+                // Rewind to oldest entry available
+                initialize(getRollbackPosition(info), Collections.emptyMap(), cursorProperties, callback);
+                return;
+            } else if (rc1 != BKException.Code.OK) {
+                log.warn("[{}] Error reading from metadata ledger {} for cursor {}: {}", ledger.getName(),
+                        ledgerId, name, BKException.getMessage(rc1));
+
+                callback.operationFailed(createManagedLedgerException(rc1));
+                return;
+            }
+
+            LedgerEntry entry = seq.nextElement();
+            byte[] data = entry.getEntry();
+            try {
+                ChunkSequenceFooter chunkSequenceFooter = parseChunkSequenceFooter(data);
+                if (chunkSequenceFooter.numParts > 0) {
+                    readChunkSequence(callback, lh, entryId, chunkSequenceFooter);
+                } else {
+                    Throwable res = tryCompleteCursorRecovery(lh, data);
+                    if (res == null) {
+                        callback.operationComplete();
+                    } else {
+                        log.warn("[{}] Error recovering from metadata ledger {} entry {} for cursor {}. "
+                                        + "Will try recovery from previous entry.",
+                                ledger.getName(), ledgerId, entryId, name, res);
+                        //try recovery from previous entry
+                        recoverFromLedgerByEntryId(info, callback, lh, entryId - 1);
+                    }
+                }
+            } catch (IOException error) {
+                log.error("Cannot parse footer", error);
+                log.warn("[{}] Error recovering from metadata ledger {} entry {} for cursor {}, cannot parse footer. "
+                                + "Will try recovery from previous entry.",
+                        ledger.getName(), ledgerId, entryId, name, error);
+                recoverFromLedgerByEntryId(info, callback, lh, entryId - 1);
+            }
+        }, null);
     }
 
     private void readChunkSequence(VoidCallback callback, LedgerHandle lh,
@@ -657,7 +678,12 @@ public class ManagedCursorImpl implements ManagedCursor {
                     callback.operationFailed(ManagedLedgerException.getManagedLedgerException(new IOException(
                             "Expected " + chunkSequenceFooter.length + " bytes but read " + result.length + " bytes")));
                 }
-                completeCursorRecovery(callback, lh, result);
+                Throwable res = tryCompleteCursorRecovery(lh, result);
+                if (res == null) {
+                    callback.operationComplete();
+                } else {
+                    callback.operationFailed(new ManagedLedgerException(res));
+                }
             }
         }, null);
     }
@@ -681,7 +707,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         return ObjectMapperFactory.getMapper().getObjectMapper().readValue(data, ChunkSequenceFooter.class);
     }
 
-    private void completeCursorRecovery(VoidCallback callback, LedgerHandle lh,  byte[] data) {
+    private Throwable tryCompleteCursorRecovery(LedgerHandle lh,  byte[] data) {
         mbean.addReadCursorLedgerSize(data.length);
 
         try {
@@ -689,8 +715,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         } catch (Throwable e) {
             log.error("[{}] Failed to decompress position info from ledger {} for cursor {}: {}", ledger.getName(),
                     lh.getId(), name, e);
-            callback.operationFailed(new ManagedLedgerException(e));
-            return;
+            return e;
         }
 
         PositionInfo positionInfo;
@@ -699,8 +724,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         } catch (InvalidProtocolBufferException e) {
             log.error("[{}] Failed to parse position info from ledger {} for cursor {}: {}", ledger.getName(),
                     lh.getId(), name, e);
-            callback.operationFailed(new ManagedLedgerException(e));
-            return;
+            return e;
         }
 
         Map<String, Long> recoveredProperties = Collections.emptyMap();
@@ -722,7 +746,7 @@ public class ManagedCursorImpl implements ManagedCursor {
             recoverBatchDeletedIndexes(positionInfo.getBatchedEntryDeletionIndexInfoList());
         }
         recoveredCursor(position, recoveredProperties, cursorProperties, lh);
-        callback.operationComplete();
+        return null;
     }
 
     private void recoverIndividualDeletedMessages(List<MLDataFormats.MessageRange> individualDeletedMessagesList) {
