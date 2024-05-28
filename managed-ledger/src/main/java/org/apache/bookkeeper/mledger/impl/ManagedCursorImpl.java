@@ -603,7 +603,7 @@ public class ManagedCursorImpl implements ManagedCursor {
         long ledgerId = lh.getId();
 
         if (entryId < 0) {
-            log.warn("[{}] Error reading from metadata ledger {} for cursor {}: No entries in ledger",
+            log.warn("[{}] Error reading from metadata ledger {} for cursor {}: No valid entries in ledger",
                     ledger.getName(), ledgerId, name);
             // Rewind to last cursor snapshot available
             initialize(getRollbackPosition(info), Collections.emptyMap(), cursorProperties, callback);
