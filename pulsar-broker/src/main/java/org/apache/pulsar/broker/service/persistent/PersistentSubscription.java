@@ -367,10 +367,9 @@ public class PersistentSubscription extends AbstractSubscription implements Subs
     @Override
     public CompletableFuture<Void> acknowledgeMessageAsync(List<Position> positions,
                                                            AckType ackType, Map<String, Long> properties) {
-        // which is the best thread ?
         return CompletableFuture.runAsync(() -> {
                 acknowledgeMessage(positions, ackType, properties);
-                }, topic.getBrokerService().pulsar().getExecutor());
+                }, topic.getBrokerService().getTopicOrderedExecutor().chooseThread(cursor.getName()));
     }
 
     @Override
