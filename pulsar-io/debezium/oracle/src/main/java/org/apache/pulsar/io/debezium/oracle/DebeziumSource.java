@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pulsar.io.debezium;
+package org.apache.pulsar.io.debezium.oracle;
 
 import io.debezium.relational.HistorizedRelationalDatabaseConnectorConfig;
 import java.util.Map;
@@ -30,7 +30,7 @@ import org.apache.pulsar.io.kafka.connect.PulsarKafkaWorkerConfig;
 @Slf4j
 public abstract class DebeziumSource extends KafkaConnectSource {
     private static final String DEFAULT_CONVERTER = "org.apache.kafka.connect.json.JsonConverter";
-    private static final String DEFAULT_HISTORY = "org.apache.pulsar.io.debezium.PulsarDatabaseHistory";
+    private static final String DEFAULT_HISTORY = "org.apache.pulsar.io.debezium.oracle.PulsarDatabaseHistory";
     private static final String DEFAULT_OFFSET_TOPIC = "debezium-offset-topic";
     private static final String DEFAULT_HISTORY_TOPIC = "debezium-history-topic";
 
@@ -88,7 +88,7 @@ public abstract class DebeziumSource extends KafkaConnectSource {
         setConfigIfNull(config, PulsarKafkaWorkerConfig.VALUE_CONVERTER_CLASS_CONFIG, DEFAULT_CONVERTER);
 
         // database.history : implementation class for database history.
-        setConfigIfNull(config, HistorizedRelationalDatabaseConnectorConfig.DATABASE_HISTORY.name(), DEFAULT_HISTORY);
+        setConfigIfNull(config, HistorizedRelationalDatabaseConnectorConfig.SCHEMA_HISTORY.name(), DEFAULT_HISTORY);
 
         // database.history.pulsar.service.url
         String pulsarUrl = (String) config.get(PulsarDatabaseHistory.SERVICE_URL.name());
