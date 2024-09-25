@@ -27,4 +27,4 @@ Upgrading Lunastreaming is essential for accessing new features that improve per
 
 This upgrade guide contains all the essential information needed for upgrading Lunastreaming, including step-by-step instructions for bare metal, Docker, and Kubernetes. It details breaking changes and the upgrade sequence, ensuring a smooth transition with minimal downtime, while keeping the messaging infrastructure robust and efficient.
 
-For specific instructions on upgrading from version 2.10 to 3.1, please refer to this [README.md](upgrade-210-to-31/README.md).
+For specific instructions on upgrading from version 2.10 to 3.1, please refer to this [README.md](upgrade-210-to-31/README.md)
