@@ -101,7 +101,7 @@ Use Helm to upgrade your existing Pulsar installation. The `--wait` flag ensures
 before completing the upgrade.
 
 ```bash
-helm upgrade pulsar --namespace pulsar --values current-values.yaml --wait
+helm upgrade  --namespace pulsar --wait --debug --timeout 1200s  --dependency-update pulsar <pulsar-helm-chart-repo-dir>/helm-chart-sources/pulsar --values current-values.yaml
 ```
 
 ### Monitor Upgrade Process
