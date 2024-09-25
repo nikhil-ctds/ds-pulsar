@@ -49,7 +49,7 @@ helm repo update
 
 ### Modify Configuration for Version Upgrade
 
-Open `helm/kaap-stack/values.yaml` and update the following fields.
+Open `helm/kaap-stack/values.yaml` and update the following fields and store it in `current-values.yaml`.
 
 - Update the image.tag to `3.1_0.1` (or the specific tag you wish to use).
 - To modify other configurations, update the values.yaml as needed in the
@@ -79,7 +79,7 @@ Use Helm to upgrade your existing Pulsar installation. The `--wait` flag ensures
 before completing the upgrade.
 
 ```bash
-helm upgrade  --namespace pulsar --wait --debug --timeout 1200s  --dependency-update pulsar <kaap-repo-dir>/helm/kaap-stack --values current-values.yaml
+helm upgrade  --namespace pulsar --wait --debug --timeout 1200s  --dependency-update pulsar <kaap-repo-dir>/helm/kaap-stack --values <path-to-current-values.yaml>
 ```
 
 ### Monitor Upgrade Process
