@@ -57,6 +57,7 @@ public class SimpleBrokerStartTest {
         config.setBrokerServicePortTls(Optional.of(0));
         config.setWebServicePortTls(Optional.of(0));
         config.setAdvertisedAddress("localhost");
+        config.setLoadBalancerOverrideBrokerNicSpeedGbps(Optional.of(1.0d));
         boolean hasNicSpeeds = LinuxInfoUtils.checkHasNicSpeeds();
         if (hasNicSpeeds) {
             @Cleanup
