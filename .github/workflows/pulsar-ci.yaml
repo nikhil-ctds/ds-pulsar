@@ -240,6 +240,9 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.jdk || '17' }}
 
+      - name: Clean Disk
+        uses: ./.github/actions/clean-disk
+
       - name: Install gh-actions-artifact-client.js
         uses: apache/pulsar-test-infra/gh-actions-artifact-client/dist@master
 
