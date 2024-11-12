@@ -78,5 +78,7 @@ runs:
         fi
         echo "::group::Available diskspace"
         time df -BM / /mnt
+        echo "250 largest directories of depth up to 3"
+        du -d 3 / 2>/dev/null | sort -n -r | head -n 250
         echo "::endgroup::"
       shell: bash
