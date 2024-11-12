@@ -80,7 +80,7 @@ runs:
         fi
         echo "::group::Available diskspace"
         time df -BM / /mnt
-        echo "200 largest directories of depth up to 3"
-        du -h -d 3 / 2>/dev/null | sort -h -r 2>/dev/null | head -n 200
+        #echo "200 largest directories of depth up to 3"
+        #du -h -d 3 / 2>/dev/null | sort -h -r 2>/dev/null | head -n 200
         echo "::endgroup::"
       shell: bash
