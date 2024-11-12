@@ -186,6 +186,7 @@ jobs:
             timeout: 75
           - name: Brokers - Broker Group 1
             group: BROKER_GROUP_1
+            timeout: 90
           - name: Brokers - Broker Group 2
             group: BROKER_GROUP_2
           - name: Brokers - Broker Group 3
@@ -209,6 +210,15 @@ jobs:
             group: CLIENT
 
     steps:
+      - name: Maximize disk space
+        uses: easimon/maximize-build-space@master
+        with:
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
       - name: checkout
         uses: actions/checkout@v4
 
@@ -261,6 +271,11 @@ jobs:
       - name: Run unit test group '${{ matrix.group }}'
         run: |
           CHANGED_TESTS="${{ needs.preconditions.outputs.tests_files }}" ./build/run_unit_group.sh ${{ matrix.group }}
+
+      - name: Disk space usage
+        run: |
+          echo "Free space:"
+          df -h 
 
       - name: Upload coverage to build artifacts
         if: ${{ needs.preconditions.outputs.collect_coverage == 'true' }}
