@@ -258,7 +258,7 @@ jobs:
 
       - name: Run unit test group '${{ matrix.group }}'
         run: |
-          CHANGED_TESTS = "${{ needs.preconditions.outputs.tests_files }}" ./build/run_unit_group.sh ${{ matrix.group }}
+          CHANGED_TESTS="${{ needs.preconditions.outputs.tests_files }}" ./build/run_unit_group.sh ${{ matrix.group }}
 
       - name: Disk space usage
         if: ${{ always() }}
