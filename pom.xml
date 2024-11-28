@@ -32,7 +32,7 @@
   <groupId>com.datastax.oss</groupId>
   <artifactId>pulsar</artifactId>
 
-  <version>3.1.4.9-SNAPSHOT</version>
+  <version>3.1.4.11-SNAPSHOT</version>
 
   <name>Pulsar</name>
   <description>Pulsar is a distributed pub-sub messaging platform with a very
@@ -95,7 +95,7 @@ flexible messaging model and an intuitive client API.</description>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <project.build.outputTimestamp>2024-10-09T11:38:34Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2024-11-14T06:24:32Z</project.build.outputTimestamp>
     <redirectTestOutputToFile>true</redirectTestOutputToFile>
 
     <!-- By default build for local Docker platform.
@@ -137,13 +137,13 @@ flexible messaging model and an intuitive client API.</description>
     <commons-compress.version>1.26.0</commons-compress.version>
 
     <bookkeeper.version>4.16.6</bookkeeper.version>
-    <zookeeper.version>3.9.2</zookeeper.version>
+    <zookeeper.version>3.9.3</zookeeper.version>
     <commons-cli.version>1.5.0</commons-cli.version>
     <commons-text.version>1.10.0</commons-text.version>
     <snappy.version>1.1.10.5</snappy.version> <!-- ZooKeeper server -->
     <dropwizardmetrics.version>4.1.12.1</dropwizardmetrics.version> <!-- ZooKeeper server -->
-    <curator.version>5.1.0</curator.version>
-    <netty.version>4.1.113.Final</netty.version>
+    <curator.version>5.7.1</curator.version>
+    <netty.version>4.1.115.Final</netty.version>
     <netty-iouring.version>0.0.21.Final</netty-iouring.version>
     <jetty.version>9.4.56.v20240826</jetty.version>
     <conscrypt.version>2.5.2</conscrypt.version>
@@ -1082,7 +1082,6 @@ flexible messaging model and an intuitive client API.</description>
         <groupId>${project.groupId}</groupId>
         <artifactId>jetcd-core-shaded</artifactId>
         <version>${project.version}</version>
-        <classifier>shaded</classifier>
         <exclusions>
           <exclusion>
             <groupId>io.etcd</groupId>

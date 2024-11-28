@@ -1164,6 +1164,7 @@ public abstract class ConsumerBase<T> extends HandlerState implements Consumer<T
                 id = msg.getMessageId();
             }
             unAckedMessageTracker.add(id, msg.getRedeliveryCount());
+            beforeConsume(msg);
             listener.received(ConsumerBase.this, msg);
         } catch (Throwable t) {
             log.error("[{}][{}] Message listener error in processing message: {}", topic, subscription,
@@ -1211,6 +1212,11 @@ public abstract class ConsumerBase<T> extends HandlerState implements Consumer<T
     protected void decreaseIncomingMessageSize(final Message<?> message) {
         INCOMING_MESSAGES_SIZE_UPDATER.addAndGet(this, -message.size());
         getMemoryLimitController().ifPresent(limiter -> limiter.releaseMemory(message.size()));
+    }
+
+    protected void increaseIncomingMessageSize(final Message<?> message) {
+        INCOMING_MESSAGES_SIZE_UPDATER.addAndGet(this, message.size());
+        getMemoryLimitController().ifPresent(limiter -> limiter.forceReserveMemory(message.size()));
     }
 
     public long getIncomingMessageSize() {

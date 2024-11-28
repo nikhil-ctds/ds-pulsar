@@ -505,7 +505,8 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
                 return null;
             }
             messageProcessed(message);
-            return beforeConsume(message);
+            message = listener == null ? beforeConsume(message) : message;
+            return message;
         } catch (InterruptedException e) {
             ExceptionHandler.handleInterruptedException(e);
             State state = getState();
@@ -1614,6 +1615,8 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
             return;
         }
 
+        // increase incomingMessageSize here because the size would be decreased in messageProcessed() next step
+        increaseIncomingMessageSize(message);
         // increase permits for available message-queue
         messageProcessed(message);
         // call interceptor and complete received callback

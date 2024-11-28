@@ -45,6 +45,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1040,6 +1041,11 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 } else if (ex.getCause() instanceof BrokerServiceException.SubscriptionFencedException
                         && isCompactionSubscription(subscriptionName)) {
                     log.warn("[{}] Failed to create compaction subscription: {}", topic, ex.getMessage());
+                } else if (ex.getCause() instanceof ManagedLedgerFencedException) {
+                    // If the topic has been fenced, we cannot continue using it. We need to close and reopen
+                    log.warn("[{}][{}] has been fenced. closing the topic {}", topic, subscriptionName,
+                            ex.getMessage());
+                    close();
                 } else {
                     log.error("[{}] Failed to create subscription: {}", topic, subscriptionName, ex);
                 }
@@ -1452,7 +1458,14 @@ public class PersistentTopic extends AbstractTopic implements Topic, AddEntryCal
                 }
                 FutureUtil.waitForAll(futures).thenRunAsync(() -> {
                     closeClientFuture.complete(null);
-                }, getOrderedExecutor()).exceptionally(ex -> {
+                }, command -> {
+                    try {
+                        getOrderedExecutor().execute(command);
+                    } catch (RejectedExecutionException e) {
+                        // executor has been shut down, execute in current thread
+                        command.run();
+                    }
+                }).exceptionally(ex -> {
                     log.error("[{}] Error closing clients", topic, ex);
                     alreadyUnFenced.set(true);
                     unfenceTopicToResume();

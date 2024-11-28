@@ -83,7 +83,6 @@ import org.apache.pulsar.broker.intercept.BrokerInterceptor;
 import org.apache.pulsar.broker.intercept.BrokerInterceptors;
 import org.apache.pulsar.broker.loadbalance.LeaderBroker;
 import org.apache.pulsar.broker.loadbalance.LeaderElectionService;
-import org.apache.pulsar.broker.loadbalance.LinuxInfoUtils;
 import org.apache.pulsar.broker.loadbalance.LoadManager;
 import org.apache.pulsar.broker.loadbalance.LoadReportUpdaterTask;
 import org.apache.pulsar.broker.loadbalance.LoadResourceQuotaUpdaterTask;
@@ -547,6 +546,11 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                 transactionBufferClient.close();
             }
 
+            if (topicPoliciesService != null) {
+                topicPoliciesService.close();
+                topicPoliciesService = null;
+            }
+
             if (client != null) {
                 client.close();
                 client = null;
@@ -745,14 +749,6 @@ public class PulsarService implements AutoCloseable, ShutdownService {
                                 + "the retention time duration is %d",
                         config.getBacklogQuotaDefaultLimitSecond(),
                         config.getDefaultRetentionTimeInMinutes() * 60));
-            }
-
-            if (config.getLoadBalancerOverrideBrokerNicSpeedGbps().isEmpty()
-                    && config.isLoadBalancerEnabled()
-                    && LinuxInfoUtils.isLinux()
-                    && !LinuxInfoUtils.checkHasNicSpeeds()) {
-                throw new IllegalStateException("Unable to read VM NIC speed. You must set "
-                        + "[loadBalancerOverrideBrokerNicSpeedGbps] to override it when load balancer is enabled.");
             }
 
             localMetadataSynchronizer = StringUtils.isNotBlank(config.getMetadataSyncEventTopic())
@@ -1017,7 +1013,7 @@ public class PulsarService implements AutoCloseable, ShutdownService {
     @VisibleForTesting
     protected PulsarResources newPulsarResources() {
         PulsarResources pulsarResources = new PulsarResources(localMetadataStore, configurationMetadataStore,
-                config.getMetadataStoreOperationTimeoutSeconds());
+                config.getMetadataStoreOperationTimeoutSeconds(), getExecutor());
 
         pulsarResources.getClusterResources().getStore().registerListener(this::handleDeleteCluster);
         return pulsarResources;
