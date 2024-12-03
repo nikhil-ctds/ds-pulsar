@@ -31,7 +31,7 @@
 
   <artifactId>pulsar-broker</artifactId>
   <packaging>jar</packaging>
-  <name>Pulsar Broker</name>
+  <name>Pulsar Broker </name>
 
   <dependencies>
     <dependency>
