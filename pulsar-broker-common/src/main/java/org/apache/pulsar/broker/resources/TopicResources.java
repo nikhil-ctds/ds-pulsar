@@ -108,8 +108,6 @@ public class TopicResources {
                         return CompletableFuture.completedFuture(null);
                     }
                 });
-        log.info("Clearing tenant persistence for tenant: {}, path {}", tenant, path);
-        return store.deleteIfExists(path, Optional.empty());
     }
 
     void handleNotification(Notification notification) {
